@@ -47,19 +47,13 @@ public class MoveSwapBlock : SwapBlock
     private const float SteerSpeed = Calc.Circle * 8f;
     private const float MaxAngle = Calc.EighthCircle;
     private const float NoSteerTime = 0.2f;
-    private const float CrashTime = 0.15f;
     private const float CrashResetTime = 0.1f;
-
-    public enum MovementState
-    {
-        Idling,
-        Moving,
-        Breaking
-    }
+    private const float CrashStartShakingTime = 0.15f;
+    private readonly float crashTime;
+    private readonly float regenTime;
+    private readonly GroupableMoveBlock groupable;
 
     public bool Triggered { get; set; }
-
-    public MovementState State { get; protected set; }
     public Directions MoveDirection { get; protected set; }
 
     private readonly bool canSteer;
@@ -123,7 +117,7 @@ public class MoveSwapBlock : SwapBlock
         Action<Vector2> orig_OnDash = listener.OnDash;
         listener.OnDash = (dir) =>
         {
-            if (State == MovementState.Breaking)
+            if (groupable.State == GroupableMoveBlock.MovementState.Breaking)
                 return;
             else if (doesReturn)
                 orig_OnDash(dir);
@@ -163,6 +157,9 @@ public class MoveSwapBlock : SwapBlock
         homeAngle = targetAngle = angle = MoveDirection.Angle();
         angleSteerSign = angle > 0f ? -1 : 1;
 
+        crashTime = data.Float("crashTime", 0.15f);
+        regenTime = data.Float("regenTime", 3f);
+
         int tilesX = (int) Width / 8;
         int tilesY = (int) Height / 8;
         MTexture buttonTexture = GFX.Game["objects/moveBlock/button"];
@@ -197,6 +194,7 @@ public class MoveSwapBlock : SwapBlock
 
         Add(moveBlockSfx = new SoundSource());
         Add(new Coroutine(Controller()));
+        Add(groupable = new GroupableMoveBlock());
 
         DynamicData dynamicData = new(this);
         Add(new MoveBlockRedirectable(dynamicData, () => false, () => MoveDirection, dir => MoveDirection = dir)
@@ -208,7 +206,7 @@ public class MoveSwapBlock : SwapBlock
             Get_MoveSfx = () => moveBlockSfx,
             OnBreakAction = (coroutine) =>
             {
-                State = MovementState.Breaking;
+                groupable.State = GroupableMoveBlock.MovementState.Breaking;
                 MoveBlockRedirectable.GetControllerDelegate(dynamicData, 4)(coroutine);
             },
         });
@@ -317,14 +315,16 @@ public class MoveSwapBlock : SwapBlock
             Rectangle moveRect;
 
             Triggered = false;
-            State = MovementState.Idling;
-            while (!Triggered && !HasPlayerRider())
+            groupable.State = GroupableMoveBlock.MovementState.Idling;
+            while (!Triggered && !HasPlayerRider() && !groupable.GroupTriggerSignal)
             {
                 yield return null;
             }
 
+            yield return new SwapImmediately(groupable.SyncGroupTriggers());
+
             Audio.Play(SFX.game_04_arrowblock_activate, Position);
-            State = MovementState.Moving;
+            groupable.State = GroupableMoveBlock.MovementState.Moving;
             StartShaking(0.2f);
             ActivateParticles();
             yield return 0.2f;
@@ -333,8 +333,9 @@ public class MoveSwapBlock : SwapBlock
             moveBlockSfx.Play(CustomSFX.game_redirectMoveBlock_arrowblock_move);
             moveBlockSfx.Param("arrow_stop", 0f);
             StopPlayerRunIntoAnimation = false;
-            float crashTimer = CrashTime;
+            float crashTimer = crashTime;
             float crashResetTimer = CrashResetTime;
+            float crashStartShakingTimer = CrashStartShakingTime;
             float noSteerTimer = NoSteerTime;
             while (true)
             {
@@ -432,12 +433,15 @@ public class MoveSwapBlock : SwapBlock
                     if (shouldBreak)
                     {
                         moveBlockSfx.Param("arrow_stop", 1f);
-                        crashResetTimer = 0.1f;
+                        crashResetTimer = CrashResetTime;
+                        if (crashStartShakingTimer < 0f)
+                            StartShaking();
                         if (!(crashTimer > 0f))
                         {
                             break;
                         }
                         crashTimer -= Engine.DeltaTime;
+                        crashStartShakingTimer -= Engine.DeltaTime;
                     }
                     else
                     {
@@ -448,7 +452,8 @@ public class MoveSwapBlock : SwapBlock
                         }
                         else
                         {
-                            crashTimer = 0.15f;
+                            crashTimer = crashTime;
+                            crashStartShakingTimer = CrashStartShakingTime;
                         }
                     }
 
@@ -463,7 +468,7 @@ public class MoveSwapBlock : SwapBlock
 
             Audio.Play(SFX.game_04_arrowblock_break, Position);
             moveBlockSfx.Stop();
-            State = MovementState.Breaking;
+            groupable.State = GroupableMoveBlock.MovementState.Breaking;
 
             moveSpeed = targetMoveSpeed = 0f;
             angle = targetAngle = homeAngle;
@@ -501,7 +506,14 @@ public class MoveSwapBlock : SwapBlock
             Audio.Stop(swapBlockData.Get<EventInstance>("moveSfx"));
 
             Visible = Collidable = path.Visible = false;
-            yield return 2.2f;
+
+            float waitTime = Calc.Clamp(regenTime - 0.8f, 0, float.MaxValue);
+            float debrisShakeTime = Calc.Clamp(regenTime - 0.6f, 0, 0.2f);
+            float debrisMoveTime = Calc.Clamp(regenTime, 0, 0.6f);
+
+            yield return waitTime;
+
+            yield return new SwapImmediately(groupable.WaitForRespawn());
 
             foreach (MoveBlockDebris debris in debrisList)
             {
@@ -521,13 +533,13 @@ public class MoveSwapBlock : SwapBlock
             {
                 debris.StartShaking();
             }
-            yield return 0.2f;
+            yield return debrisShakeTime;
 
             foreach (MoveBlockDebris debris in debrisList)
             {
-                debris.ReturnHome(0.65f);
+                debris.ReturnHome(debrisMoveTime + 0.05f);
             }
-            yield return 0.6f;
+            yield return debrisMoveTime;
 
             routine.RemoveSelf();
             foreach (MoveBlockDebris debris in debrisList)
@@ -541,6 +553,7 @@ public class MoveSwapBlock : SwapBlock
             swapBlockData.Set("speed", 0.0f);
             Swapping = false;
 
+            groupable.WaitingForRespawn = false;
             Audio.Play(SFX.game_04_arrowblock_reappear, Position);
             Visible = path.Visible = true;
             EnableStaticMovers();
@@ -579,11 +592,11 @@ public class MoveSwapBlock : SwapBlock
     private void UpdateColors()
     {
         Color color = Calc.HexToColor("6f98a6");
-        if (State == MovementState.Moving)
+        if (groupable.State == GroupableMoveBlock.MovementState.Moving)
         {
             color = Calc.HexToColor("ff7e12");
         }
-        else if (State == MovementState.Breaking)
+        else if (groupable.State == GroupableMoveBlock.MovementState.Breaking)
         {
             color = Calc.HexToColor("794a94");
         }
@@ -859,7 +872,7 @@ public class MoveSwapBlock : SwapBlock
             {
                 block.swapUpdate = true; // Reset in On hook
 
-                if (block.State == MovementState.Breaking)
+                if (block.groupable.State == GroupableMoveBlock.MovementState.Breaking)
                     return true;
 
                 if (!block.doesReturn)
@@ -967,13 +980,13 @@ public class MoveSwapBlock : SwapBlock
         // DrawBlockStyle is also used by the SwapBlock PathRenderer, which just passes null to the middle argument
         if (self is MoveSwapBlock block && middle != null)
         {
-            if (block.State != MovementState.Breaking)
+            if (block.groupable.State != GroupableMoveBlock.MovementState.Breaking)
             {
                 // This can probably be cleaned up, but I haven't bothered to understand it
                 int value = Calc.Clamp((int) Math.Floor(((block.angle + (Calc.QuarterCircle * 5)) % Calc.Circle / Calc.Circle * 8f) + 0.5f), 0, 7);
 
                 Image middleImage = middle;
-                if (block.State == MovementState.Moving && !block.Swapping && (block.Position == block.start || block.Position == block.end))
+                if (block.groupable.State == GroupableMoveBlock.MovementState.Moving && !block.Swapping && (block.Position == block.start || block.Position == block.end))
                     middleImage = block.middleOrange;
 
 

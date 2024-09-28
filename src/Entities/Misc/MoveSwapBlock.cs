@@ -160,6 +160,8 @@ public class MoveSwapBlock : SwapBlock
         crashTime = data.Float("crashTime", 0.15f);
         regenTime = data.Float("regenTime", 3f);
 
+        Add(groupable = new GroupableMoveBlock());
+
         int tilesX = (int) Width / 8;
         int tilesY = (int) Height / 8;
         MTexture buttonTexture = GFX.Game["objects/moveBlock/button"];
@@ -194,7 +196,6 @@ public class MoveSwapBlock : SwapBlock
 
         Add(moveBlockSfx = new SoundSource());
         Add(new Coroutine(Controller()));
-        Add(groupable = new GroupableMoveBlock());
 
         DynamicData dynamicData = new(this);
         Add(new MoveBlockRedirectable(dynamicData, () => false, () => MoveDirection, dir => MoveDirection = dir)

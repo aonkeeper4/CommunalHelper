@@ -343,6 +343,7 @@ public class ConnectedMoveBlock : ConnectedSolid
                     }
                     else
                     {
+                        StopShaking();
                         crashTimer = crashTime;
                         crashStartShakingTimer = CrashStartShakingTime;
                     }

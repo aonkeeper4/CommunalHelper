@@ -362,6 +362,7 @@ public class DreamMoveBlock : CustomDreamBlock
                     }
                     else
                     {
+                        StopShaking();
                         crashTimer = crashTime;
                         crashStartShakingTimer = CrashStartShakingTime;
                     }

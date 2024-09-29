@@ -14,13 +14,6 @@ namespace Celeste.Mod.CommunalHelper.Entities;
 [CustomEntity("CommunalHelper/CassetteMoveBlock")]
 public class CassetteMoveBlock : CustomCassetteBlock
 {
-    public enum MovementState
-    {
-        Idling,
-        Moving,
-        Breaking
-    }
-
     private const float Accel = 300f;
     private const float MoveSpeed = 60f;
     private const float FastMoveSpeed = 75f;
@@ -31,12 +24,12 @@ public class CassetteMoveBlock : CustomCassetteBlock
     private readonly float crashTime;
     private readonly float regenTime;
 
+    private readonly GroupableMoveBlock groupable;
+
     private readonly float moveSpeed;
     public Directions Direction;
     private readonly float homeAngle;
     private Vector2 startPosition;
-    public MovementState State = MovementState.Idling;
-
     private float speed;
     private float targetSpeed;
     private float angle;
@@ -74,6 +67,7 @@ public class CassetteMoveBlock : CustomCassetteBlock
 
         Add(moveSfx = new SoundSource());
         Add(new Coroutine(Controller()));
+        Add(groupable = new GroupableMoveBlock());
 
         P_Activate = new ParticleType(MoveBlock.P_Activate) { Color = color };
         P_Move = new ParticleType(MoveBlock.P_Move) { Color = color };
@@ -114,12 +108,14 @@ public class CassetteMoveBlock : CustomCassetteBlock
         while (true)
         {
             triggered = false;
-            State = MovementState.Idling;
-            while (!triggered && !HasPlayerRider())
+            groupable.State = GroupableMoveBlock.MovementState.Idling;
+            while (!triggered && !HasPlayerRider() && !groupable.GroupTriggerSignal)
                 yield return null;
 
+            yield return new SwapImmediately(groupable.SyncGroupTriggers());
+
             Audio.Play(SFX.game_04_arrowblock_activate, Position);
-            State = MovementState.Moving;
+            groupable.State = GroupableMoveBlock.MovementState.Moving;
             StartShaking(0.2f);
             ActivateParticles();
             yield return 0.2f;
@@ -217,7 +213,7 @@ public class CassetteMoveBlock : CustomCassetteBlock
 
             Audio.Play(SFX.game_04_arrowblock_break, Position);
             moveSfx.Stop();
-            State = MovementState.Breaking;
+            groupable.State = GroupableMoveBlock.MovementState.Breaking;
             speed = targetSpeed = 0f;
             angle = targetAngle = homeAngle;
             StartShaking(0.2f);
@@ -256,6 +252,8 @@ public class CassetteMoveBlock : CustomCassetteBlock
 
             yield return waitTime;
 
+            yield return new SwapImmediately(groupable.WaitForRespawn());
+
             foreach (MoveBlockDebris d in debris)
                 d.StopMoving();
             while (CollideCheck<Actor>() || CollideCheck<Solid>())
@@ -277,6 +275,8 @@ public class CassetteMoveBlock : CustomCassetteBlock
             routine.RemoveSelf();
             foreach (MoveBlockDebris d in debris)
                 d.RemoveSelf();
+
+            groupable.WaitingForRespawn = false;
             Audio.Play("event:/game/04_cliffside/arrowblock_reappear", Position);
             Visible = true;
             SetDisabledStaticMoversVisibility(true);
@@ -418,7 +418,7 @@ public class CassetteMoveBlock : CustomCassetteBlock
     public override void HandleUpdateVisualState()
     {
         base.HandleUpdateVisualState();
-        bool crossVisible = State == MovementState.Breaking;
+        bool crossVisible = groupable.State == GroupableMoveBlock.MovementState.Breaking;
         arrow.Visible &= !crossVisible;
         arrowPressed.Visible &= !crossVisible;
         cross.Visible &= crossVisible;

@@ -33,6 +33,7 @@ public class DreamMoveBlock : CustomDreamBlock
     private const float CrashStartShakingTime = 0.15f;
     private readonly float crashTime;
     private readonly float regenTime;
+    private readonly bool shakeOnCollision;
 
     private readonly float moveSpeed;
 
@@ -144,6 +145,7 @@ public class DreamMoveBlock : CustomDreamBlock
 
         crashTime = data.Float("crashTime", 0.15f);
         regenTime = data.Float("regenTime", 3f);
+        shakeOnCollision = data.Bool("shakeOnCollision", true);
 
         if (data.Attr("idleButtonsColor", "FFFFFF") != "FFFFFF")
         {
@@ -344,7 +346,7 @@ public class DreamMoveBlock : CustomDreamBlock
                 {
                     moveSfx.Param("arrow_stop", 1f);
                     crashResetTimer = CrashResetTime;
-                    if (crashStartShakingTimer < 0f)
+                    if (crashStartShakingTimer < 0f && shakeOnCollision)
                         StartShaking();
                     if (!(crashTimer > 0f) && !shattering)
                     {

@@ -23,6 +23,7 @@ public class CassetteMoveBlock : CustomCassetteBlock
     private const float CrashStartShakingTime = 0.15f;
     private readonly float crashTime;
     private readonly float regenTime;
+    private readonly bool shakeOnCollision;
 
     private readonly GroupableMoveBlock groupable;
 
@@ -57,7 +58,7 @@ public class CassetteMoveBlock : CustomCassetteBlock
     private readonly ParticleType P_Break;
     private readonly ParticleType P_BreakPressed;
 
-    public CassetteMoveBlock(Vector2 position, EntityID id, int width, int height, Directions direction, float moveSpeed, int index, float tempo, bool oldConnectionBehavior, Color? overrideColor, float crashTime, float regenTime)
+    public CassetteMoveBlock(Vector2 position, EntityID id, int width, int height, Directions direction, float moveSpeed, int index, float tempo, bool oldConnectionBehavior, Color? overrideColor, float crashTime, float regenTime, bool shakeOnCollision)
         : base(position, id, width, height, index, tempo, true, oldConnectionBehavior, dynamicHitbox: true, overrideColor)
     {
         startPosition = position;
@@ -68,6 +69,7 @@ public class CassetteMoveBlock : CustomCassetteBlock
 
         this.crashTime = crashTime;
         this.regenTime = regenTime;
+        this.shakeOnCollision = shakeOnCollision;
 
         Add(moveSfx = new SoundSource());
         Add(new Coroutine(Controller()));
@@ -90,7 +92,7 @@ public class CassetteMoveBlock : CustomCassetteBlock
     }
 
     public CassetteMoveBlock(EntityData data, Vector2 offset, EntityID id)
-        : this(data.Position + offset, id, data.Width, data.Height, data.Enum("direction", Directions.Left), data.Bool("fast") ? FastMoveSpeed : data.Float("moveSpeed", MoveSpeed), data.Int("index"), data.Float("tempo", 1f), data.Bool("oldConnectionBehavior", true), data.HexColorNullable("customColor"), data.Float("crashTime", 0.15f), data.Float("regenTime", 3f))
+        : this(data.Position + offset, id, data.Width, data.Height, data.Enum("direction", Directions.Left), data.Bool("fast") ? FastMoveSpeed : data.Float("moveSpeed", MoveSpeed), data.Int("index"), data.Float("tempo", 1f), data.Bool("oldConnectionBehavior", true), data.HexColorNullable("customColor"), data.Float("crashTime", 0.15f), data.Float("regenTime", 3f), data.Bool("shakeOnCollision", true))
     {
     }
 
@@ -191,7 +193,7 @@ public class CassetteMoveBlock : CustomCassetteBlock
                 {
                     moveSfx.Param("arrow_stop", 1f);
                     crashResetTimer = CrashResetTime;
-                    if (crashStartShakingTimer < 0f)
+                    if (crashStartShakingTimer < 0f && shakeOnCollision)
                         StartShaking();
                     if (!(crashTimer > 0f))
                     {

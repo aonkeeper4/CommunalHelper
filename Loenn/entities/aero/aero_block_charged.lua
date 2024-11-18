@@ -47,6 +47,7 @@ aeroBlockCharged.placements = {
             activeColor = "4BC0C8",
             inactiveColor = "FF6347",
             easing = "CubeIn",
+            SpirialisBug = false,
             cassetteIndex = -1,
             moveOnCassetteTick = false,
         }
@@ -64,6 +65,7 @@ for i = 1, 4 do
             activeColor = colors[i],
             inactiveColor = "FF6347",
             easing = "CubeIn",
+            SpirialisBug = false,
             cassetteIndex = i - 1,
             moveOnCassetteTick = true,
         }

@@ -717,6 +717,8 @@ entities.CommunalHelper/AeroBlockCharged.attributes.description.loop=Whether thi
 entities.CommunalHelper/AeroBlockCharged.attributes.description.activeColor=This block's button and screen particles color when it is active (flying). 
 entities.CommunalHelper/AeroBlockCharged.attributes.description.inactiveColor=This block's button colors when it is inactive.
 entities.CommunalHelper/AeroBlockCharged.attributes.description.SpirialisBug=This toggles a legacy behavior where dependent on load order, Spirialis Helper will disable the Lift Boost Cap of an Aero Block.\nTurning this on effectively makes your momentum much stronger than normal from aeroblocks in most, but not all, cases.
+entities.CommunalHelper/AeroBlockCharged.attributes.description.cassetteIndex=The cassette index of this Charged Aero Block. If set to anything other than "None", the buttons on this block will become active and inactive in sync with cassette blocks of this index. Setting this to "None" disables this behavior (default).
+entities.CommunalHelper/AeroBlockCharged.attributes.description.moveOnCassetteTick=Whether this block will move to the next node at the end of the current cassette tick if it has not been activated already. Does nothing if "Cassette Index" is set to "None".
 
 # Aero Block Slingshot
 entities.CommunalHelper/AeroBlockSlingshot.placements.name.normal=Slingshot Aero Block

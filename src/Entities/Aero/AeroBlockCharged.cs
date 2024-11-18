@@ -14,10 +14,10 @@ public class AeroBlockCharged : AeroBlockFlying
     [Flags]
     private enum ButtonCombination : byte
     {
-        NONE    = 0,
-        TOP     = 1 << 0,
-        LEFT    = 1 << 1,
-        RIGHT   = 1 << 2,
+        NONE = 0,
+        TOP = 1 << 0,
+        LEFT = 1 << 1,
+        RIGHT = 1 << 2,
 
         HORIZONTAL = LEFT | RIGHT,
         VERTICAL = TOP,
@@ -32,6 +32,7 @@ public class AeroBlockCharged : AeroBlockFlying
     private sealed class Button
     {
         private readonly Image[] buttonImages, buttonOutlineImages;
+        private readonly Vector2[] imagePositions;
 
         private bool visible;
         public bool Visible
@@ -46,19 +47,21 @@ public class AeroBlockCharged : AeroBlockFlying
             }
         }
 
+        private bool preventVisualUpdate = false;
+
         private bool pressed;
         public bool Pressed
         {
             get => pressed && visible;
             private set
             {
-                if (pressed != value)
+                if (pressed != value && !preventVisualUpdate)
                 {
-                    Vector2 offset = perp * (pressed ? -2 : +2);
+                    Vector2 offset = perp * (pressed ? 0 : 2);
                     for (int i = 0; i < buttonImages.Length; i++)
                     {
-                        buttonImages[i].Position += offset;
-                        buttonOutlineImages[i].Position += offset;
+                        buttonImages[i].Position = imagePositions[i] + offset;
+                        buttonOutlineImages[i].Position = imagePositions[i] + offset;
                     }
                 }
                 pressed = value;
@@ -74,6 +77,8 @@ public class AeroBlockCharged : AeroBlockFlying
             buttonImages = new Image[length];
             buttonOutlineImages = new Image[length];
 
+            imagePositions = new Vector2[length];
+
             this.visible = visible;
             perp = dir.Perpendicular();
 
@@ -82,6 +87,7 @@ public class AeroBlockCharged : AeroBlockFlying
                 int tx = i == 0 ? 0 : (i == length - 1 ? 16 : 8);
                 Vector2 pos = offset + dir * (i * 8);
 
+                imagePositions[i] = pos;
                 buttonImages[i] = new Image(ButtonFillTexture.GetSubtexture(tx, 0, 8, 8))
                 {
                     Rotation = angle,
@@ -100,9 +106,13 @@ public class AeroBlockCharged : AeroBlockFlying
             }
         }
 
-        public void Update(AeroBlockCharged self)
+        public void Update(AeroBlockCharged self, bool preventVisualUpdate)
         {
+            this.preventVisualUpdate = preventVisualUpdate;
             Pressed = self.CollideCheck<Player>(self.Position - perp * 3);
+
+            if (preventVisualUpdate)
+                return;
 
             lerp = pressed
                 ? 1.0f
@@ -113,14 +123,25 @@ public class AeroBlockCharged : AeroBlockFlying
                 buttonImages[i].Color = color;
         }
 
+        public void ChangeProperties(int pressOffset, Color color)
+        {
+            Vector2 offset = perp * (Pressed ? 2 : pressOffset);
+            for (int i = 0; i < buttonImages.Length; i++)
+            {
+                buttonImages[i].Position = imagePositions[i] + offset;
+                buttonOutlineImages[i].Position = imagePositions[i] + offset;
+                buttonImages[i].Color = color;
+            }
+        }
+
         public static Button LeftButton(AeroBlockCharged entity, bool visible)
-            => new(entity, (int) entity.Height / 8, visible, Vector2.UnitY * (entity.Height - 4), -Vector2.UnitY, -MathHelper.PiOver2);
+            => new(entity, (int) entity.Height / 8, visible, new(0, entity.Height - 4), -Vector2.UnitY, -MathHelper.PiOver2);
 
         public static Button RightButton(AeroBlockCharged entity, bool visible)
             => new(entity, (int) entity.Height / 8, visible, new(entity.Width, 4), Vector2.UnitY, +MathHelper.PiOver2);
 
         public static Button TopButton(AeroBlockCharged entity, bool visible)
-            => new(entity, (int) entity.Width / 8, visible, Vector2.UnitX * 4, Vector2.UnitX, 0.0f);
+            => new(entity, (int) entity.Width / 8, visible, new(4, 0), Vector2.UnitX, 0.0f);
     }
 
     private const string DEFAULT_BUTTON_SEQUENCE = "horizontal";
@@ -128,6 +149,10 @@ public class AeroBlockCharged : AeroBlockFlying
     private int positionIndex, combinationIndex;
 
     private readonly bool loop;
+
+    private readonly int cassetteIndex = -1;
+    private CassetteListener listener;
+    private readonly bool moveOnCassetteTick;
 
     private bool alive = true;
     private readonly bool SpirialisBug = false;
@@ -139,19 +164,23 @@ public class AeroBlockCharged : AeroBlockFlying
     private readonly SoundSource buttonSfx;
 
     private readonly AeroScreen_Wind windLayer;
+    private readonly AeroScreen_Cassette cassetteLayer;
     private readonly SineWave windSine;
 
     private readonly Vector2[] positions;
 
     private readonly Color activeColor, inactiveColor;
 
+    private bool activatedThisTick = false;
+    private bool activatedAlready = false;
+
     public AeroBlockCharged(EntityData data, Vector2 offset)
-        : this(data.NodesWithPosition(offset), data.Width, data.Height, data.Bool("loop"), data.HexColor("activeColor", defaultOnColor), data.HexColor("inactiveColor", defaultEndColor), data.Bool("hover", true), data.Attr("buttonSequence", DEFAULT_BUTTON_SEQUENCE))
+        : this(data.NodesWithPosition(offset), data.Width, data.Height, data.Bool("loop"), data.HexColor("activeColor", defaultOnColor), data.HexColor("inactiveColor", defaultEndColor), data.Bool("hover", true), data.Attr("buttonSequence", DEFAULT_BUTTON_SEQUENCE), data.Int("cassetteIndex", -1), data.Bool("moveOnCassetteTick"))
     {
         SpirialisBug = data.Bool("SpirialisBug", false);
     }
 
-    public AeroBlockCharged(Vector2[] positions, int width, int height, bool loop, Color activeColor, Color inactiveColor, bool hover = true, string buttonSequence = DEFAULT_BUTTON_SEQUENCE)
+    public AeroBlockCharged(Vector2[] positions, int width, int height, bool loop, Color activeColor, Color inactiveColor, bool hover = true, string buttonSequence = DEFAULT_BUTTON_SEQUENCE, int cassetteIndex = -1, bool moveOnCassetteTick = false)
         : base(positions[0], width, height)
     {
         Hover = hover;
@@ -159,7 +188,19 @@ public class AeroBlockCharged : AeroBlockFlying
         if (positions.Length is 0)
             throw new ArgumentException("The array of positions must have at least one element (the first one being the starting position of the entity).", nameof(positions));
         this.positions = positions;
-        
+
+        this.cassetteIndex = cassetteIndex;
+        if (IsCassette)
+        {
+            Add(listener = new CassetteListener(cassetteIndex));
+            listener.OnActivated += OnActivated;
+            listener.OnWillActivate += OnWillActivate;
+            listener.OnDeactivated += OnDeactivated;
+            listener.OnWillDeactivate += OnWillDeactivate;
+            AddScreenLayer(cassetteLayer = new(width, height, listener, activeColor));
+        }
+        this.moveOnCassetteTick = moveOnCassetteTick;
+
         sequence = ParseButtonSequence(buttonSequence, positions.Length);
         ChangeCombination(sequence[0], makeTiles: false);
 
@@ -177,6 +218,31 @@ public class AeroBlockCharged : AeroBlockFlying
         this.activeColor = activeColor;
         this.inactiveColor = inactiveColor;
     }
+
+    public bool IsCassette => cassetteIndex != -1;
+
+    private void ChangeButtonProperties(int buttonOffset, Color newColor, Color newPressedColor)
+    {
+        leftButton?.ChangeProperties(buttonOffset, leftButton.Pressed ? newPressedColor : newColor);
+        rightButton?.ChangeProperties(buttonOffset, rightButton.Pressed ? newPressedColor : newColor);
+        topButton?.ChangeProperties(buttonOffset, topButton.Pressed ? newPressedColor : newColor);
+    }
+
+    private void OnWillActivate() => ChangeButtonProperties(1, Color.Lerp(Color.White, inactiveColor, 0.5f), Color.Lerp(activeColor, inactiveColor, 0.5f));
+    private void OnActivated()
+    {
+        ChangeButtonProperties(0, Color.White, activeColor);
+        activatedThisTick = false;
+    }
+    private void OnWillDeactivate() => ChangeButtonProperties(1, Color.Lerp(Color.White, inactiveColor, 0.5f), Color.Lerp(activeColor, inactiveColor, 0.5f));
+    private void OnDeactivated()
+    {
+        ChangeButtonProperties(2, inactiveColor, inactiveColor);
+        if (moveOnCassetteTick && !activatedThisTick && activatedAlready && alive)
+            IncrementPosition();
+    }
+
+    private void ForceButtonDeactivate() => ChangeButtonProperties(2, inactiveColor, inactiveColor);
 
     private static ButtonCombination[] ParseButtonSequence(string sequence, int max)
     {
@@ -214,15 +280,15 @@ public class AeroBlockCharged : AeroBlockFlying
         return $"objects/CommunalHelper/aero_block/blocks/{(left ? y : n)}{(top ? y : n)}{(right ? y : n)}";
     }
 
-    public bool CheckTopButton() => topButton?.Pressed ?? false;
-    public bool CheckLeftButton() => leftButton?.Pressed ?? false;
-    public bool CheckRightButton() => rightButton?.Pressed ?? false;
+    public bool CheckTopButton() => (topButton?.Pressed ?? false) && (listener?.Activated ?? true);
+    public bool CheckLeftButton() => (leftButton?.Pressed ?? false) && (listener?.Activated ?? true);
+    public bool CheckRightButton() => (rightButton?.Pressed ?? false) && (listener?.Activated ?? true);
     public bool CheckAnyButton() => CheckLeftButton() || CheckTopButton() || CheckRightButton();
 
     private void ChangeCombination(ButtonCombination combination, bool makeTiles = true)
     {
         if (makeTiles)
-           RemakeBlockTiles(GetBlockPath(combination));
+            RemakeBlockTiles(GetBlockPath(combination));
 
         leftButton ??= Button.LeftButton(this, true);
         if (leftButton is not null)
@@ -259,7 +325,12 @@ public class AeroBlockCharged : AeroBlockFlying
         {
             blinker.Complete = true;
             RemoveScreenLayer(windLayer);
-        }); 
+            if (IsCassette)
+            {
+                RemoveScreenLayer(cassetteLayer);
+                Remove(listener);
+            }
+        });
     }
 
     private void Smash(Player player, Vector2 speed)
@@ -274,6 +345,15 @@ public class AeroBlockCharged : AeroBlockFlying
         Input.Rumble(RumbleStrength.Strong, RumbleLength.Short);
         (Scene as Level).DirectionalShake(Vector2.UnitY);
         windLayer.MulitplyVelocities(-0.5f);
+
+        IncrementPosition();
+    }
+
+    private void IncrementPosition()
+    {
+        activatedAlready = true;
+        if (IsCassette)
+            activatedThisTick = true;
 
         positionIndex++;
         if (loop)
@@ -296,13 +376,27 @@ public class AeroBlockCharged : AeroBlockFlying
         base.Added(scene);
     }
 
+    public override void Awake(Scene scene)
+    {
+        base.Awake(scene);
+
+        // update visuals if deactivated on start
+        if (IsCassette && (!listener?.Activated ?? false))
+            ForceButtonDeactivate();
+    }
+
     public override void Update()
     {
         base.Update();
 
-        leftButton?.Update(this);
-        rightButton?.Update(this);
-        topButton?.Update(this);
+        if (alive)
+        {
+            leftButton?.Update(this, !listener?.Activated ?? false);
+            rightButton?.Update(this, !listener?.Activated ?? false);
+            topButton?.Update(this, !listener?.Activated ?? false);
+        }
+        else
+            ForceButtonDeactivate();
 
         bool check = CheckAnyButton();
         if (check)
@@ -387,11 +481,13 @@ public class AeroBlockCharged : AeroBlockFlying
         {
             Vector2 v = ExcessBoost(self);
             orig(self, particles, playSfx);
-            if(self.OnGround() && block is not null && block.CheckTopButton())
+            if (self.OnGround() && block is not null && block.CheckTopButton())
                 block.Smash(self, Vector2.UnitY * -350);
             self.Speed += v;
             player_varJumpSpeed.SetValue(self, self.Speed.Y);
-        } else {
+        }
+        else
+        {
             orig(self, particles, playSfx);
 
             if (!self.OnGround())
@@ -431,11 +527,11 @@ public class AeroBlockCharged : AeroBlockFlying
         orig(self);
 
         // climbjump
-        if (!(self.Scene.Tracker.Entities.TryGetValue(typeof(AeroBlockCharged), out var q) && Collide.First(self, q, self.Position + Vector2.UnitX * (int)self.Facing * 3) is AeroBlockCharged block)) { return; } 
+        if (!(self.Scene.Tracker.Entities.TryGetValue(typeof(AeroBlockCharged), out var q) && Collide.First(self, q, self.Position + Vector2.UnitX * (int) self.Facing * 3) is AeroBlockCharged block)) { return; }
         if (block is not null && (self.Facing == Facings.Right ? block.CheckLeftButton() : block.CheckRightButton()))
         {
-            float speed = ((int)self.Facing == Math.Sign(Input.MoveX.Value)) ? 300 : -300;
-            block.Smash(self, new Vector2((int)self.Facing * speed, -300));
+            float speed = ((int) self.Facing == Math.Sign(Input.MoveX.Value)) ? 300 : -300;
+            block.Smash(self, new Vector2((int) self.Facing * speed, -300));
         }
     }
 

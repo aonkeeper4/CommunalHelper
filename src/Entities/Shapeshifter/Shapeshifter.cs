@@ -77,8 +77,11 @@ public sealed class ShapeshifterPath : Entity
  * 
  * todo:
  * figure out how to combine paths and path extensions into one "thing"  (problem: multi room paths. surely this doesnt need a map data processor :fearful:)
- * add global signalling to shapeshifter path trigger to allow starting multiple shapeshifters in different rooms on the same multi-room path
- * how should the shapeshifter deal with room transitions? do we wait for the player or just go through or
+ * actually if i use a map data processor do i even need this to be a thing on the c# side
+ * add global signalling to shapeshifter path trigger to allow starting multiple shapeshifters in different rooms on the same multi-room path (hang on this should come for free? maybe if i make multi-room shapeshifters and paths global)
+ * how should the shapeshifter deal with room transitions? do we wait for the player or just go through or something else
+ * loenn rendering :oshiregret2:
+ * speedruntool doesn't ignore global entities when making states apparently. ummmmm surely this won't be an issue cluegrin
  */
 [CustomEntity("CommunalHelper/ShapeshifterPathExtension")]
 public sealed class ShapeshifterPathExtension : Entity

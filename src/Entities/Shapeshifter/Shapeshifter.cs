@@ -22,7 +22,7 @@ public sealed class ShapeshifterPath : Entity
     public int ID { get; }
 
     public float QuakeTime { get; set; }
-    public float FakeoutTime { get; set; } 
+    public float FakeoutTime { get; set; }
     public float FakeoutDistance { get; set; }
 
     public ShapeshifterPath(EntityData data, Vector2 offset, EntityID id)
@@ -70,6 +70,24 @@ public sealed class ShapeshifterPath : Entity
     }
 }
 
+/* shapeshifter path extensions can extend the travel path of a shapeshifter path, allowing for paths to be made out of multiple cubic beziers instead of just 1
+ * they also allow shapeshifters placed at the start of an extension to optionally connect to the parent curve of that extension in such a way they they move along the parent curve starting from the start of the extension.
+ * otherwise they would move according to the parent path, starting at the beginning.
+ * they can also connect to shapeshifter paths and path extensions in previous rooms :frogeline:
+ * 
+ * todo:
+ * figure out how to combine paths and path extensions into one "thing"  (problem: multi room paths. surely this doesnt need a map data processor :fearful:)
+ * add global signalling to shapeshifter path trigger to allow starting multiple shapeshifters in different rooms on the same multi-room path
+ * how should the shapeshifter deal with room transitions? do we wait for the player or just go through or
+ */
+[CustomEntity("CommunalHelper/ShapeshifterPathExtension")]
+public sealed class ShapeshifterPathExtension : Entity
+{
+    private readonly bool multiRoom;
+
+    private ShapeshifterPath parent;
+}
+
 [CustomEntity("CommunalHelper/Shapeshifter")]
 [Tracked]
 public class Shapeshifter : Solid
@@ -87,7 +105,7 @@ public class Shapeshifter : Solid
     private readonly string startSound, finishSound;
     private readonly float startShake, finishShake;
     private readonly float rainbowMix;
-    
+
     private readonly SoundSource sfx;
 
     public Shapeshifter(EntityData data, Vector2 offset, EntityID id)
@@ -258,7 +276,7 @@ public class Shapeshifter : Solid
         }
         if (startShake > 0.0f)
             Input.Rumble(RumbleStrength.Medium, RumbleLength.Short);
-        
+
         if (path.Yaw != 0f || path.Pitch != 0f || path.Roll != 0f)
         {
             Collidable = false;

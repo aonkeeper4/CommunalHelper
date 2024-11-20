@@ -1,3 +1,6 @@
+// todo:
+// combine ShapeshifterPaths and ShapeshifterPathExtensions into ShapeshifterPaths with multiple curve segments, failing to do so if forking / looping paths detected
+
 using System.Collections.Generic;
 
 namespace Celeste.Mod.CommunalHelper.MapDataProcessors;

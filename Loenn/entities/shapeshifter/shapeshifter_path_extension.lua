@@ -144,6 +144,7 @@ function pathExtension.nodeAdded(room, entity, nodeIndex)
 
     for _, e in ipairs(room.entities) do
         if e._name == "CommunalHelper/ShapeshifterPathExtension" and e.parentId == entity._id then
+            -- prevent users placing forking paths on accident
             return false
         end
     end

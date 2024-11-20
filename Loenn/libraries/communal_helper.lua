@@ -4,6 +4,7 @@ local drawableSprite = require("structs.drawable_sprite")
 local drawableNinePatch = require("structs.drawable_nine_patch")
 local utils = require("utils")
 local connectedEntities = require("helpers.connected_entities")
+local state = require("loaded_state")
 
 local communalHelper = {}
 
@@ -16,6 +17,29 @@ function communalHelper.hexToColor(hex, default)
         color = { r, g, b, a }
     end
     return color
+end
+
+function communalHelper.nextAvailableId()
+    local idLayers = { "entities", "triggers" }
+    local ids = {}
+
+    for _, targetLayer in ipairs(idLayers) do
+        for _, targetRoom in ipairs(state.map.rooms) do
+            if targetRoom[targetLayer] then
+                for _, target in ipairs(targetRoom[targetLayer]) do
+                    if target._id then
+                        ids[target._id] = true
+                    end
+                end
+            end
+        end
+    end
+
+    for id = 0, math.huge do
+        if not ids[id] then
+            return id
+        end
+    end
 end
 
 -- cassette blocks
@@ -307,6 +331,21 @@ function communalHelper.getCubicCurvePoint(start, stop, controlA, controlB, t)
 
     local x = mt3 * start[1] + aMul * controlA[1] + bMul * controlB[1] + t3 * stop[1]
     local y = mt3 * start[2] + aMul * controlA[2] + bMul * controlB[2] + t3 * stop[2]
+
+    return x, y
+end
+
+function communalHelper.getCubicCurveDerivative(start, stop, controlA, controlB, t)
+    local tm = t - 1
+    local threetm1 = (3 * t) - 1
+
+    local fa = -3 * tm * tm
+    local fb = 3 * tm * threetm1
+    local fc = 1 - (threetm1 * threetm1)
+    local fd = 3 * t * t
+
+    local x = (fa * start[1]) + (fb * controlA[1]) + (fc * controlB[1]) + (fd * stop[1])
+    local y = (fa * start[2]) + (fb * controlA[2]) + (fc * controlB[2]) + (fd * stop[2])
 
     return x, y
 end

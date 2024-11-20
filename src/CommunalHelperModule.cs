@@ -12,6 +12,7 @@ using Celeste.Mod.CommunalHelper.Imports;
 using Celeste.Mod.CommunalHelper.States;
 using Celeste.Mod.CommunalHelper.Triggers;
 using Celeste.Mod.CommunalHelper.Triggers.StrawberryJam;
+using Celeste.Mod.CommunalHelper.MapDataProcessors;
 using MonoMod.ModInterop;
 
 namespace Celeste.Mod.CommunalHelper;
@@ -217,12 +218,13 @@ public class CommunalHelperModule : EverestModule
         // We create a static CrystalStaticSpinner which needs to access Tags.TransitionUpdate
         // Which wouldn't be loaded in time for EverestModule.Load
         TimedTriggerSpikes.LoadDelayed();
-        
+
         // Because of StrawberryJam, trying to hook the LaserEmitter codebase breaks the Laser Emitters because both the CommunalHelper and StrawberryJam hooks cannot be cross-compatible
         // (at least until we can update StrawberryJam to fix it)
         // Therefore, we load this hook conditionally dependent on if StrawberryJam has loaded its hooks, and use the same flags it uses to achieve the same effect
         // This also makes both StrawberryJam's and CommunalHelper's flags intercompatible
-        if(Everest.Loader.DependencyLoaded(new EverestModuleMetadata { Name = "StrawberryJam2021", Version = new Version("1.0.0") })) {
+        if (Everest.Loader.DependencyLoaded(new EverestModuleMetadata { Name = "StrawberryJam2021", Version = new Version("1.0.0") }))
+        {
             LaserEmitter.Load();
         }
 
@@ -322,6 +324,13 @@ public class CommunalHelperModule : EverestModule
         SavingSettings = true;
         base.SaveSettings();
         SavingSettings = false;
+    }
+
+    public override void PrepareMapDataProcessors(MapDataFixup context)
+    {
+        base.PrepareMapDataProcessors(context);
+
+        context.Add<ShapeshifterPathProcessor>();
     }
 
     // Loading "custom" entities

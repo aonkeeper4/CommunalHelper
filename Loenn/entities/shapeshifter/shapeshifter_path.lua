@@ -1,8 +1,13 @@
-local drawableSprite = require "structs.drawable_sprite"
-local drawableLine = require "structs.drawable_line"
-local utils = require "utils"
-local mods = require "mods"
-local communalHelper = mods.requireFromPlugin "libraries.communal_helper"
+local drawableSprite = require("structs.drawable_sprite")
+local drawableLine = require("structs.drawable_line")
+local utils = require("utils")
+local toolUtils = require("tool_utils")
+local state = require("loaded_state")
+local celesteRender = require("celeste_render")
+local entities = require("entities")
+local mods = require("mods")
+local communalHelper = mods.requireFromPlugin("libraries.communal_helper")
+local shapeshifterUtils = mods.requireFromPlugin("libraries.shapeshifter_utils")
 
 local path = {}
 
@@ -62,7 +67,7 @@ local cubicControlLineColor = { 0.5, 0.5, 0.5, 0.075 }
 local controlNodeTexture = "particles/CommunalHelper/ring"
 local arrowTexture = "particles/CommunalHelper/l"
 
-function path.sprite(room, entity)
+function path.sprite(room, entity, viewport)
     local x, y = entity.x or 0, entity.y or 0
     local nodes = entity.nodes or { { x = x + 16, y = y }, { x = x + 32, y = y }, { x = x + 48, y = y } }
 
@@ -108,6 +113,14 @@ function path.sprite(room, entity)
     table.insert(sprites,
         drawableLine.fromPoints({ ca.x + 0.5, ca.y + 0.5, cb.x + 0.5, cb.y + 0.5 }, cubicControlLineColor))
 
+    local child, childRoom = shapeshifterUtils.findChild(room, entity)
+    local pathExtensionHandler = entities.registeredEntities["CommunalHelper/ShapeshifterPathExtension"]
+    if child then
+        for _, sprite in ipairs(pathExtensionHandler.sprite(childRoom, child, viewport, entity)) do
+            table.insert(sprites, sprite)
+        end
+    end
+
     return sprites
 end
 
@@ -123,17 +136,16 @@ function path.selection(room, entity)
     return utils.rectangle(x - 4, y - 4, 8, 8), nodeRectangles
 end
 
--- always return false out of this, otherwise loenn assumes we added nodes and so tries to access ones that don't exist, resulting in a crash
+-- always return false from this, otherwise loenn assumes we added nodes and so tries to access ones that don't exist, resulting in a crash
 function path.nodeAdded(room, entity, nodeIndex)
-    local x, y = entity.nodes[3].x or 0, entity.nodes[3].y or 0
+    local x, y = entity.x or 0, entity.y or 0
+    local nodes = entity.nodes or { { x = x + 16, y = y }, { x = x + 32, y = y }, { x = x + 48, y = y } }
+    local nx, ny = nodes[3].x or x + 48, entity.nodes[3].y or y
 
-    for _, e in ipairs(room.entities) do
-        if e._name == "CommunalHelper/ShapeshifterPathExtension" and e.parentId == entity._id then
-            return false
-        end
-    end
+    local child, _ = shapeshifterUtils.findChild(room, entity)
+    if child then return false end
 
-    -- can't do it the "proper" way with placementUtils.placeItem as it would break in future loenn versions.
+    -- can't do it the "proper" way with placementUtils.placeItem as it would break in future loenn versions
     table.insert(room.entities, {
         _type = "entity",
         _name = "CommunalHelper/ShapeshifterPathExtension",
@@ -142,20 +154,46 @@ function path.nodeAdded(room, entity, nodeIndex)
         multiRoom = false,
         nodes = {
             {
-                x = x + 32,
-                y = y
+                x = nx + 32,
+                y = ny
             },
             {
-                x = x + 48,
-                y = y
+                x = nx + 48,
+                y = ny
             }
         },
         parentId = entity._id,
-        x = x + 16,
-        y = y,
+        x = nx + 16,
+        y = ny,
     })
-
+    -- i'm a bit worried about the performance of this but uhhh we'll see
+    toolUtils.redrawTargetLayer(room, "entities")
     return false
+end
+
+function path.move(room, entity, nodeIndex, offsetX, offsetY)
+    -- default move behavior
+    if nodeIndex == 0 then
+        entity.x = entity.x + offsetX
+        entity.y = entity.y + offsetY
+    else
+        local nodes = entity.nodes
+
+        if nodes and nodeIndex <= #nodes then
+            local target = nodes[nodeIndex]
+
+            target.x = target.x + offsetX
+            target.y = target.y + offsetY
+        end
+    end
+
+    -- this gets the parent and child rooms to update visually even if they're deselected.
+    -- i'm a bit worried about the performance of this but uhhh we'll see
+    -- ooouh  yeah you can feel itt
+    local child, childRoom = shapeshifterUtils.findChild(room, entity)
+    if child then
+        celesteRender.forceRedrawRoom(childRoom, state, false)
+    end
 end
 
 return path

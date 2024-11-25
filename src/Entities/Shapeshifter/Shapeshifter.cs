@@ -1,7 +1,11 @@
 ﻿using Celeste.Mod.CommunalHelper.Components;
 using Celeste.Mod.CommunalHelper.Utils;
+using MonoMod.Cil;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
+using System.Reflection;
 
 namespace Celeste.Mod.CommunalHelper.Entities;
 
@@ -15,7 +19,6 @@ namespace Celeste.Mod.CommunalHelper.Entities;
  * actually if i use a map data processor do i even need this to be a thing on the c# side
  * add global signalling to shapeshifter path trigger to allow starting multiple shapeshifters in different rooms on the same multi-room path (hang on this should come for free? maybe if i make multi-room shapeshifters and paths global)
  * how should the shapeshifter deal with room transitions? do we wait for the player or just go through or something else
- * loenn rendering :oshiregret2:
  * speedruntool doesn't ignore global entities when making states apparently. ummmmm surely this won't be an issue cluegrin
  */
 [CustomEntity("CommunalHelper/ShapeshifterPath")]
@@ -24,6 +27,10 @@ public sealed class ShapeshifterPath : Entity
 {
     public BakedCurve Curve { get; }
     public Vector2 Start { get; }
+
+    public bool MultiRoom { get; }
+
+    public Dictionary<int, Vector2> ShapeshifterAttachPoints { get; }
 
     public Ease.Easer Easer { get; }
     public float Duration { get; }
@@ -39,12 +46,13 @@ public sealed class ShapeshifterPath : Entity
     public float FakeoutDistance { get; set; }
 
     public ShapeshifterPath(EntityData data, Vector2 offset, EntityID id)
-        : this
-        (
+        : this(
             id.ID,
             data.NodesWithPosition(offset),
+            data.Attr("shapeshifterAttachIndices"),
             data.Easer("easer"),
             data.Float("duration", 2.0f),
+            data.Bool("multiRoom"),
             data.Int("rotateYaw"),
             data.Int("rotatePitch"),
             data.Int("rotateRoll"),
@@ -53,23 +61,36 @@ public sealed class ShapeshifterPath : Entity
         )
     { }
 
-    public ShapeshifterPath
-    (
+    public ShapeshifterPath(
         int id,
-        Vector2[] points, Ease.Easer easer, float duration,
+        Vector2[] points, string shapeshifterAttachIndices, Ease.Easer easer, float duration,
+        bool multiRoom,
         int yaw, int pitch, int roll,
         float quakeTime = 0.5f,
         float fakeoutTime = 0.75f, float fakeoutDistance = 32.0f
     )
     {
-        if (points.Length is not 4)
-            throw new ArgumentException("points must be an array of 4 points", nameof(points));
+        if ((points.Length - 1) % 3 != 0)
+            throw new ArgumentException("points must be a valid set of control points for a cubic bezier spline", nameof(points));
 
         Start = points[0];
         Curve = new BakedCurve(points, CurveType.Cubic, 32);
+        ShapeshifterAttachPoints = (Dictionary<int, Vector2>) shapeshifterAttachIndices
+            .Split(",")
+            .Select(num =>
+            {
+                if (int.TryParse(num, out int i) && i >= 0 && i < Curve.CurveCount)
+                    return (i, points[i * 3]);
+                else
+                    throw new ArgumentException($"got bad or out of range shapeshifter attach index: {i}", nameof(shapeshifterAttachIndices));
+            });
 
         Easer = easer;
         Duration = duration;
+
+        MultiRoom = multiRoom;
+        if (MultiRoom)
+            Tag |= Tags.Global;
 
         Yaw = yaw;
         Pitch = pitch;
@@ -83,6 +104,7 @@ public sealed class ShapeshifterPath : Entity
     }
 }
 
+// todo: implement WaitForPlayer
 [CustomEntity("CommunalHelper/Shapeshifter")]
 [Tracked]
 public class Shapeshifter : Solid
@@ -103,9 +125,38 @@ public class Shapeshifter : Solid
 
     private readonly SoundSource sfx;
 
+    public enum MultiRoomBehavior
+    {
+        None,
+        IgnorePlayer,
+        // WaitForPlayer,
+    }
+    private readonly MultiRoomBehavior multiRoomBehavior;
+    public bool MultiRoom
+    {
+        get
+        {
+            return multiRoomBehavior != MultiRoomBehavior.None && (Tag & Tags.Global) != 0;
+        }
+
+        set
+        {
+            if (multiRoomBehavior != MultiRoomBehavior.None)
+            {
+                if (value)
+                {
+                    Tag |= Tags.Global;
+                }
+                else
+                {
+                    Tag &= ~Tags.Global;
+                }
+            }
+        }
+    }
+
     public Shapeshifter(EntityData data, Vector2 offset, EntityID id)
-        : this
-        (
+        : this(
             id.ID, data.Position + offset,
             data.Int("voxelWidth", 1), data.Int("voxelHeight", 1), data.Int("voxelDepth", 1),
             data.Attr("model", string.Empty), data.Char("defaultTile", '0'),
@@ -113,12 +164,12 @@ public class Shapeshifter : Solid
             data.Attr("finishSound", SFX.game_gen_touchswitch_gate_finish),
             data.Float("startShake", 0.2f), data.Float("finishShake", 0.2f),
             data.Float("rainbowMix", 0.2f),
-            data.Int("surfaceSoundIndex", SurfaceIndex.Asphalt)
+            data.Int("surfaceSoundIndex", SurfaceIndex.Asphalt),
+            (MultiRoomBehavior) data.Int("multiRoomBehavior", 0)
         )
     { }
 
-    public Shapeshifter
-    (
+    public Shapeshifter(
         int id, Vector2 position,
         int width, int height, int depth,
         string model, char defaultTile = '0',
@@ -126,7 +177,8 @@ public class Shapeshifter : Solid
         string finishSound = SFX.game_gen_touchswitch_gate_finish,
         float startShake = 0.2f, float finishShake = 0.2f,
         float rainbowMix = 0.2f,
-        int surfaceSoundIndex = SurfaceIndex.Asphalt
+        int surfaceSoundIndex = SurfaceIndex.Asphalt,
+        MultiRoomBehavior multiRoomBehavior = MultiRoomBehavior.None
     )
         : base(position, 0, 0, safe: true)
     {
@@ -220,22 +272,27 @@ public class Shapeshifter : Solid
         //sfx.Position = Center - Position;
     }
 
-    private ShapeshifterPath FindPath()
+    private (ShapeshifterPath, int) FindPath()
     {
         if (Collider is null)
-            return null;
+            return (null, 0);
 
         var bounds = Collider.Bounds;
         var paths = Scene.Tracker.GetEntities<ShapeshifterPath>()
                                  .Cast<ShapeshifterPath>();
         foreach (ShapeshifterPath path in paths)
         {
-            var ptRect = new Rectangle((int) path.Start.X - 2, (int) path.Start.Y - 2, 4, 4);
-            if (bounds.Intersects(ptRect))
-                return path;
+            foreach (KeyValuePair<int, Vector2> attachPointPair in path.ShapeshifterAttachPoints)
+            {
+                int index = attachPointPair.Key;
+                Vector2 attachPoint = attachPointPair.Value;
+                var ptRect = new Rectangle((int) attachPoint.X - 2, (int) attachPoint.Y - 2, 4, 4);
+                if (bounds.Intersects(ptRect))
+                    return (path, index);
+            }
         }
 
-        return null;
+        return (null, 0);
     }
 
     internal void FollowPath(ShapeshifterPath path)
@@ -243,15 +300,19 @@ public class Shapeshifter : Solid
         if (moving)
             return;
 
-        path ??= FindPath();
-        if (path is null)
-            return;
+        (ShapeshifterPath newPath, int index) = FindPath();
+        path ??= newPath;
+        if (path is ShapeshifterPath)
+        {
+            MultiRoom = path.MultiRoom;
+        }
+        else return;
 
         moving = true;
-        Add(new Coroutine(Sequence(path)));
+        Add(new Coroutine(Sequence(path, index)));
     }
 
-    private IEnumerator Sequence(ShapeshifterPath path)
+    private IEnumerator Sequence(ShapeshifterPath path, int startingIndex)
     {
         Level level = Scene as Level;
 
@@ -288,10 +349,9 @@ public class Shapeshifter : Solid
         float finalPitch = pitch + pathPitch;
         float finalRoll = roll + pathRoll;
 
-        float distance = 0.0f;
+        float distance = path.Curve.GetDistanceByT(startingIndex);
 
-        IEnumerator Travel
-        (
+        IEnumerator Travel(
             float duration,
             Ease.Easer easer,
             float distanceTo,
@@ -328,8 +388,7 @@ public class Shapeshifter : Solid
         }
 
         if (path.FakeoutTime > 0.0f)
-            yield return Travel
-            (
+            yield return Travel(
                 path.FakeoutTime, Ease.CubeOut, path.FakeoutDistance,
                 yaw - pathYaw / 4f, pitch - pathPitch / 4f, roll - pathRoll / 4f,
                 (t, _, _) =>
@@ -341,8 +400,7 @@ public class Shapeshifter : Solid
             );
 
         sfx.Resume();
-        yield return Travel
-        (
+        yield return Travel(
             path.Duration, path.Easer, path.Curve.Length,
             finalYaw, finalPitch, finalRoll,
             (t, ease, moveSpeed) =>
@@ -378,6 +436,8 @@ public class Shapeshifter : Solid
         }
         if (finishShake > 0.0f)
             Input.Rumble(RumbleStrength.Medium, RumbleLength.Short);
+
+        MultiRoom = false;
     }
 
     public override void Update()

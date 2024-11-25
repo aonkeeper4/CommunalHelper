@@ -14,7 +14,7 @@ function shapeshifterUtils.findParent(currentRoom, entity)
                 parentIsExtension = e._name == "CommunalHelper/ShapeshifterPathExtension"
                 if (parentIsPath or parentIsExtension) and e._id == entity.parentId then
                     parent = e
-                    local finalNode = parentIsPath and e.nodes[3] or e.nodes[2]
+                    local finalNode = e.nodes[parentIsPath and 3 or 2]
                     parentFinalNode = {
                         x = (finalNode.x or e.x - 16) + targetRoom.x - currentRoom.x,
                         y = (finalNode.y or e.y) + targetRoom.y - currentRoom.y,

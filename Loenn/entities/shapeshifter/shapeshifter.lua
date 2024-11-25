@@ -5,6 +5,11 @@ local mods = require "mods"
 local voxel = mods.requireFromPlugin "libraries.communal_helper_voxel"
 local enums = require "consts.celeste_enums"
 
+local multiRoomBehaviorOptions = {
+    ["None"] = 0,
+    ["Ignore Player"] = 1,
+}
+
 local shapeshifter = {}
 
 shapeshifter.name = "CommunalHelper/Shapeshifter"
@@ -44,7 +49,11 @@ shapeshifter.fieldInformation = {
         validator = function(input)
             return #input == 1
         end
-    }
+    },
+    multiRoomBehavior = {
+        options = multiRoomBehaviorOptions,
+        editable = false,
+    },
 }
 
 shapeshifter.placements = {
@@ -62,6 +71,7 @@ shapeshifter.placements = {
             surfaceSoundIndex = 1,
             model = "",
             defaultTile = "0",
+            multiRoomBehavior = 0
         }
     }
 }
@@ -92,7 +102,7 @@ function shapeshifter.sprite(room, entity)
     local paths = {}
     for _, other in ipairs(room.entities) do
         if other._name == "CommunalHelper/ShapeshifterPath" then
-            table.insert(paths, {path = other, borrowed = false})
+            table.insert(paths, { path = other, borrowed = false })
         end
     end
 
@@ -103,24 +113,35 @@ function shapeshifter.sprite(room, entity)
 
         local rotatedVox = vox
 
-        if rollWrap == 1 then rotatedVox = voxel.counterclockwiseRotationAboutZ(rotatedVox, "0")
-        elseif rollWrap == 2 then rotatedVox = voxel.mirrorAboutZ(rotatedVox, "0")
-        elseif rollWrap == 3 then rotatedVox = voxel.clockwiseRotationAboutZ(rotatedVox, "0")
+        if rollWrap == 1 then
+            rotatedVox = voxel.counterclockwiseRotationAboutZ(rotatedVox, "0")
+        elseif rollWrap == 2 then
+            rotatedVox = voxel.mirrorAboutZ(rotatedVox, "0")
+        elseif rollWrap == 3 then
+            rotatedVox = voxel.clockwiseRotationAboutZ(rotatedVox, "0")
         end
 
-        if pitchWrap == 1 then rotatedVox = voxel.counterclockwiseRotationAboutX(rotatedVox, "0")
-        elseif pitchWrap == 2 then rotatedVox = voxel.mirrorAboutX(rotatedVox, "0")
-        elseif pitchWrap == 3 then rotatedVox = voxel.clockwiseRotationAboutX(rotatedVox, "0")
+        if pitchWrap == 1 then
+            rotatedVox = voxel.counterclockwiseRotationAboutX(rotatedVox, "0")
+        elseif pitchWrap == 2 then
+            rotatedVox = voxel.mirrorAboutX(rotatedVox, "0")
+        elseif pitchWrap == 3 then
+            rotatedVox = voxel.clockwiseRotationAboutX(rotatedVox, "0")
         end
 
-        if yawWrap == 1 then rotatedVox = voxel.counterclockwiseRotationAboutY(rotatedVox, "0")
-        elseif yawWrap == 2 then rotatedVox = voxel.mirrorAboutY(rotatedVox, "0")
-        elseif yawWrap == 3 then rotatedVox = voxel.clockwiseRotationAboutY(rotatedVox, "0")
+        if yawWrap == 1 then
+            rotatedVox = voxel.counterclockwiseRotationAboutY(rotatedVox, "0")
+        elseif yawWrap == 2 then
+            rotatedVox = voxel.mirrorAboutY(rotatedVox, "0")
+        elseif yawWrap == 3 then
+            rotatedVox = voxel.clockwiseRotationAboutY(rotatedVox, "0")
         end
 
         local sx, sy, _ = rotatedVox:size()
 
-        table.insert(sprites, drawableRectangle.fromRectangle("bordered", x - sx * 4, y - sy * 4, sx * 8, sy * 8, {1.0, 1.0, 1.0, 0.25}, {1.0, 1.0, 1.0, 0.5}))
+        table.insert(sprites,
+            drawableRectangle.fromRectangle("bordered", x - sx * 4, y - sy * 4, sx * 8, sy * 8, { 1.0, 1.0, 1.0, 0.25 },
+                { 1.0, 1.0, 1.0, 0.5 }))
 
         addTilesFromVoxel(sprites, rotatedVox, room, x - sx * 4, y - sy * 4)
 

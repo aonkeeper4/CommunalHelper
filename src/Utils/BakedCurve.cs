@@ -161,6 +161,17 @@ public class BakedCurve
         }
     }
 
+    public float GetDistanceByT(float t)
+    {
+        float i = t * resolution;
+
+        float remainder = i % 1;
+        float x = lut[(int) i];
+        float y = lut[(int) i + 1];
+
+        return x + remainder * (y - x);
+    }
+
     public Vector2 GetPointByDistance(float distance)
     {
         return GetPoint(SolveForTGivenDistance(distance));

@@ -78,7 +78,7 @@ public sealed class ShapeshifterPath : Entity
                 if (int.TryParse(num, out int i) && i >= 0 && i < Curve.CurveCount)
                     return points[i * 3];
                 else
-                    throw new ArgumentException($"got bad or out of range shapeshifter attach index: {i}", nameof(shapeshifterAttachIndices));
+                    throw new ArgumentException($"got bad or out of range shapeshifter attach index: '{num}'", nameof(shapeshifterAttachIndices));
             })
             .ToArray();
 

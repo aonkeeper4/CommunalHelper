@@ -9,23 +9,27 @@ public class ShapeshifterPathProcessor : EverestMapDataProcessor
     private static Dictionary<string, List<Dictionary<int, List<int>>>> shapeshifterPaths = new();
     // childAdoptionPool[AreaSID][ModeID][parentID] = child it needs to adopt
     private static Dictionary<string, List<Dictionary<int, List<int>>>> childAdoptionPool = new();
-    // shapeshifterPaths[AreaSID][ModeID][pathID] = path element
-    private static Dictionary<string, List<Dictionary<int, BinaryPacker.Element>>> pathsByID;
+    // shapeshifterPaths[AreaSID][ModeID][pathID] = (room element, path element)
+    private static Dictionary<string, List<Dictionary<int, (BinaryPacker.Element, BinaryPacker.Element)>>> pathsByID = new();
 
     public override Dictionary<string, Action<BinaryPacker.Element>> Init()
     {
         Util.Log($"Initializing shapeshifter path processor for {AreaKey.SID} / {AreaKey.Mode}");
 
+        string sid = AreaKey.SID;
+        int mode = (int) AreaKey.Mode;
+
+        BinaryPacker.Element currentRoom = new();
+        void roomProcessor(BinaryPacker.Element room) => currentRoom = room;
+
         void shapeshifterPathProcessor(BinaryPacker.Element shapeshifterPath)
         {
-            string sid = AreaKey.SID;
-            int mode = (int) AreaKey.Mode;
             int id = shapeshifterPath.AttrInt("id");
 
-            Dictionary<int, BinaryPacker.Element> allPathsInMap = pathsByID[sid][mode];
+            Dictionary<int, (BinaryPacker.Element, BinaryPacker.Element)> allPathsInMap = pathsByID[sid][mode];
             if (!allPathsInMap.ContainsKey(id))
             {
-                allPathsInMap[id] = shapeshifterPath;
+                allPathsInMap[id] = (currentRoom, shapeshifterPath);
             }
             else
             {
@@ -63,14 +67,12 @@ public class ShapeshifterPathProcessor : EverestMapDataProcessor
 
         void shapeshifterPathExtensionProcessor(BinaryPacker.Element shapeshifterPathExtension)
         {
-            string sid = AreaKey.SID;
-            int mode = (int) AreaKey.Mode;
             int selfID = shapeshifterPathExtension.AttrInt("id"), parentID = shapeshifterPathExtension.AttrInt("parentId");
 
-            Dictionary<int, BinaryPacker.Element> allPathsInMap = pathsByID[sid][mode];
+            Dictionary<int, (BinaryPacker.Element, BinaryPacker.Element)> allPathsInMap = pathsByID[sid][mode];
             if (!allPathsInMap.ContainsKey(selfID))
             {
-                allPathsInMap[selfID] = shapeshifterPathExtension;
+                allPathsInMap[selfID] = (currentRoom, shapeshifterPathExtension);
             }
             else
             {
@@ -131,50 +133,10 @@ public class ShapeshifterPathProcessor : EverestMapDataProcessor
         }
 
         return new Dictionary<string, Action<BinaryPacker.Element>>() {
+            {"level", roomProcessor},
             {"entity:CommunalHelper/ShapeshifterPath",  shapeshifterPathProcessor},
             {"entity:CommunalHelper/ShapeshifterPathExtension",  shapeshifterPathExtensionProcessor}
         };
-    }
-
-    public override void End()
-    {
-        // todo: merge all parent-child dictionaries into single ShapeshifterPaths containing all nodes
-        Util.Log($"Merging shapeshifter paths for {AreaKey.SID} / {AreaKey.Mode}");
-
-        string sid = AreaKey.SID;
-        int mode = (int) AreaKey.Mode;
-
-        Dictionary<int, List<int>> allParentsInMap = shapeshifterPaths[sid][mode];
-        Dictionary<int, BinaryPacker.Element> allPathsInMap = pathsByID[sid][mode];
-        foreach ((int parentID, List<int> childIDs) in allParentsInMap)
-        {
-            BinaryPacker.Element parent = allPathsInMap[parentID];
-            foreach (BinaryPacker.Element childNode in childIDs.SelectMany(id => allPathsInMap[id].Children))
-            {
-                parent.Children.Add(childNode);
-            }
-        }
-
-        shapeshifterPaths.Clear();
-        childAdoptionPool.Clear();
-        pathsByID.Clear();
-    }
-
-    private void ResetMapDataDict<T>(ref Dictionary<string, List<T>> dict) where T : new()
-    {
-        if (!dict.ContainsKey(AreaKey.SID))
-        {
-            // create an entry for the current map SID.
-            dict[AreaKey.SID] = new();
-        }
-        while (dict[AreaKey.SID].Count <= (int) AreaKey.Mode)
-        {
-            // fill out the empty space before the current map MODE with empty dictionaries.
-            dict[AreaKey.SID].Add(new());
-        }
-
-        // reset the dictionary for the current map and mode.
-        dict[AreaKey.SID][(int) AreaKey.Mode] = new();
     }
 
     public override void Reset()
@@ -184,5 +146,72 @@ public class ShapeshifterPathProcessor : EverestMapDataProcessor
         ResetMapDataDict(ref shapeshifterPaths);
         ResetMapDataDict(ref childAdoptionPool);
         ResetMapDataDict(ref pathsByID);
+    }
+
+    private void ResetMapDataDict<T>(ref Dictionary<string, List<T>> dict) where T : new()
+    {
+        string sid = AreaKey.SID;
+        int mode = (int) AreaKey.Mode;
+
+        if (!dict.ContainsKey(sid))
+        {
+            dict[sid] = new();
+        }
+        while (dict[sid].Count <= mode)
+        {
+            dict[sid].Add(new());
+        }
+        dict[sid][mode] = new();
+    }
+
+    public override void End()
+    {
+        Util.Log($"Merging shapeshifter paths for {AreaKey.SID} / {AreaKey.Mode}");
+
+        string sid = AreaKey.SID;
+        int mode = (int) AreaKey.Mode;
+
+        Dictionary<int, List<int>> allParentsInMap = shapeshifterPaths[sid][mode];
+        Dictionary<int, (BinaryPacker.Element, BinaryPacker.Element)> allPathsInMap = pathsByID[sid][mode];
+        foreach ((int parentID, List<int> childIDs) in allParentsInMap)
+        {
+            List<int> attachIndices = new() { 0 };
+            (BinaryPacker.Element parentRoom, BinaryPacker.Element parent) = allPathsInMap[parentID];
+            int parentRoomX = parentRoom.AttrInt("x"), parentRoomY = parentRoom.AttrInt("y");
+
+            foreach ((int i, (BinaryPacker.Element childRoom, BinaryPacker.Element child)) in childIDs.Select((id, i) => (i, allPathsInMap[id])))
+            {
+                int childRoomX = childRoom.AttrInt("x"), childRoomY = childRoom.AttrInt("y");
+
+                if (child.AttrBool("attachShapeshifters"))
+                {
+                    attachIndices.Add(i + 1);
+                }
+
+                float childX = child.AttrFloat("x"), childY = child.AttrFloat("y");
+                parent.Children.Add(MakeNode(childX + childRoomX - parentRoomX, childY + childRoomY - parentRoomY));
+
+                foreach (BinaryPacker.Element node in child.Children)
+                {
+                    float nodeX = node.AttrFloat("x"), nodeY = node.AttrFloat("y");
+                    parent.Children.Add(MakeNode(nodeX + childRoomX - parentRoomX, nodeY + childRoomY - parentRoomY));
+                }
+            }
+
+            parent.SetAttr("shapeshifterAttachIndices", string.Join(",", attachIndices));
+        }
+    }
+
+    private static BinaryPacker.Element MakeNode(float x, float y)
+    {
+        return new()
+        {
+            Package = "",
+            Name = "node",
+            Attributes = new() {
+                {"x", x},
+                {"y", y}
+            }
+        };
     }
 }

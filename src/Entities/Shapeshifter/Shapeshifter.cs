@@ -1,11 +1,7 @@
 ﻿using Celeste.Mod.CommunalHelper.Components;
 using Celeste.Mod.CommunalHelper.Utils;
-using MonoMod.Cil;
 using System.Collections;
-using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
-using System.Reflection;
 
 namespace Celeste.Mod.CommunalHelper.Entities;
 
@@ -30,7 +26,7 @@ public sealed class ShapeshifterPath : Entity
 
     public bool MultiRoom { get; }
 
-    public Dictionary<int, Vector2> ShapeshifterAttachPoints { get; }
+    public Vector2[] ShapeshifterAttachPoints { get; }
 
     public Ease.Easer Easer { get; }
     public float Duration { get; }
@@ -75,15 +71,16 @@ public sealed class ShapeshifterPath : Entity
 
         Start = points[0];
         Curve = new BakedCurve(points, CurveType.Cubic, 32);
-        ShapeshifterAttachPoints = (Dictionary<int, Vector2>) shapeshifterAttachIndices
+        ShapeshifterAttachPoints = shapeshifterAttachIndices
             .Split(",")
             .Select(num =>
             {
                 if (int.TryParse(num, out int i) && i >= 0 && i < Curve.CurveCount)
-                    return (i, points[i * 3]);
+                    return points[i * 3];
                 else
                     throw new ArgumentException($"got bad or out of range shapeshifter attach index: {i}", nameof(shapeshifterAttachIndices));
-            });
+            })
+            .ToArray();
 
         Easer = easer;
         Duration = duration;
@@ -282,13 +279,13 @@ public class Shapeshifter : Solid
                                  .Cast<ShapeshifterPath>();
         foreach (ShapeshifterPath path in paths)
         {
-            foreach (KeyValuePair<int, Vector2> attachPointPair in path.ShapeshifterAttachPoints)
+            int pathIndex = 0;
+            foreach (Vector2 attachPoint in path.ShapeshifterAttachPoints)
             {
-                int index = attachPointPair.Key;
-                Vector2 attachPoint = attachPointPair.Value;
                 var ptRect = new Rectangle((int) attachPoint.X - 2, (int) attachPoint.Y - 2, 4, 4);
                 if (bounds.Intersects(ptRect))
-                    return (path, index);
+                    return (path, pathIndex);
+                pathIndex++;
             }
         }
 

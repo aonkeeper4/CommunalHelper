@@ -178,9 +178,15 @@ public class ShapeshifterPathProcessor : EverestMapDataProcessor
             List<int> attachIndices = new() { 0 };
             (BinaryPacker.Element parentRoom, BinaryPacker.Element parent) = allPathsInMap[parentID];
             int parentRoomX = parentRoom.AttrInt("x"), parentRoomY = parentRoom.AttrInt("y");
+            bool multiRoom = false;
 
             foreach ((int i, (BinaryPacker.Element childRoom, BinaryPacker.Element child)) in childIDs.Select((id, i) => (i, allPathsInMap[id])))
             {
+                if (parentRoom != childRoom)
+                {
+                    multiRoom = true;
+                }
+
                 int childRoomX = childRoom.AttrInt("x"), childRoomY = childRoom.AttrInt("y");
 
                 if (child.AttrBool("attachShapeshifters"))
@@ -199,6 +205,7 @@ public class ShapeshifterPathProcessor : EverestMapDataProcessor
             }
 
             parent.SetAttr("shapeshifterAttachIndices", string.Join(",", attachIndices));
+            parent.SetAttr("multiRoom", multiRoom);
         }
     }
 

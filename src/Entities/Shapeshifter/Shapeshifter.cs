@@ -11,11 +11,11 @@ namespace Celeste.Mod.CommunalHelper.Entities;
  * they can also connect to shapeshifter paths and path extensions in previous rooms :frogeline:
  * 
  * todo:
- * figure out how to combine paths and path extensions into one "thing"  (problem: multi room paths. surely this doesnt need a map data processor :fearful:)
- * actually if i use a map data processor do i even need this to be a thing on the c# side
- * add global signalling to shapeshifter path trigger to allow starting multiple shapeshifters in different rooms on the same multi-room path (hang on this should come for free? maybe if i make multi-room shapeshifters and paths global)
- * how should the shapeshifter deal with room transitions? do we wait for the player or just go through or something else
- * speedruntool doesn't ignore global entities when making states apparently. ummmmm surely this won't be an issue cluegrin
+ * the multiroom stuff needs a levelloadingthread hook to always load
+ * implement WaitForPlayer
+ * add indicator for where shapeshifters can attach in the loenn plugin
+ * performance improvements in the move functon in the loenn plugin
+ * uhh i think the order in which we add orpahned parents to the adoption pool is backwards
  */
 [CustomEntity("CommunalHelper/ShapeshifterPath")]
 [Tracked]
@@ -129,28 +129,8 @@ public class Shapeshifter : Solid
         // WaitForPlayer,
     }
     private readonly MultiRoomBehavior multiRoomBehavior;
-    public bool MultiRoom
-    {
-        get
-        {
-            return multiRoomBehavior != MultiRoomBehavior.None && (Tag & Tags.Global) != 0;
-        }
 
-        set
-        {
-            if (multiRoomBehavior != MultiRoomBehavior.None)
-            {
-                if (value)
-                {
-                    Tag |= Tags.Global;
-                }
-                else
-                {
-                    Tag &= ~Tags.Global;
-                }
-            }
-        }
-    }
+    private Coroutine sequenceRoutine;
 
     public Shapeshifter(EntityData data, Vector2 offset, EntityID id)
         : this(
@@ -219,6 +199,8 @@ public class Shapeshifter : Solid
         sfx.Pause();
 
         SurfaceSoundIndex = surfaceSoundIndex;
+
+        this.multiRoomBehavior = multiRoomBehavior;
     }
 
     private void BuildCollider()
@@ -269,6 +251,20 @@ public class Shapeshifter : Solid
         //sfx.Position = Center - Position;
     }
 
+    public override void Awake(Scene scene)
+    {
+        base.Awake(scene);
+
+        if (multiRoomBehavior != MultiRoomBehavior.None)
+        {
+            Tag |= Tags.Global;
+            if (!FindPath().Item1?.MultiRoom ?? true)
+            {
+                Tag &= ~Tags.Global;
+            }
+        }
+    }
+
     private (ShapeshifterPath, int) FindPath()
     {
         if (Collider is null)
@@ -299,14 +295,21 @@ public class Shapeshifter : Solid
 
         (ShapeshifterPath newPath, int index) = FindPath();
         path ??= newPath;
-        if (path is ShapeshifterPath)
+        if (path is not null && multiRoomBehavior != MultiRoomBehavior.None)
         {
-            MultiRoom = path.MultiRoom;
+            if (path.MultiRoom)
+            {
+                Tag |= Tags.Global;
+            }
+            else
+            {
+                Tag &= ~Tags.Global;
+            }
         }
         else return;
 
         moving = true;
-        Add(new Coroutine(Sequence(path, index)));
+        Add(sequenceRoutine = new Coroutine(Sequence(path, index)));
     }
 
     private IEnumerator Sequence(ShapeshifterPath path, int startingIndex)
@@ -434,7 +437,7 @@ public class Shapeshifter : Solid
         if (finishShake > 0.0f)
             Input.Rumble(RumbleStrength.Medium, RumbleLength.Short);
 
-        MultiRoom = false;
+        Tag &= ~Tags.Global;
     }
 
     public override void Update()

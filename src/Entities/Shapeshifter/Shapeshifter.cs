@@ -11,11 +11,10 @@ namespace Celeste.Mod.CommunalHelper.Entities;
  * they can also connect to shapeshifter paths and path extensions in previous rooms :frogeline:
  * 
  * todo:
- * the multiroom stuff needs a levelloadingthread hook to always load
  * implement WaitForPlayer
  * add indicator for where shapeshifters can attach in the loenn plugin
+ * fix shapeshifter end position indicator on shapeshifter paths in the loenn plugin
  * performance improvements in the move functon in the loenn plugin
- * uhh i think the order in which we add orpahned parents to the adoption pool is backwards
  */
 [CustomEntity("CommunalHelper/ShapeshifterPath")]
 [Tracked]
@@ -66,6 +65,8 @@ public sealed class ShapeshifterPath : Entity
         float fakeoutTime = 0.75f, float fakeoutDistance = 32.0f
     )
     {
+        Util.Log($"loaded path id {id} with points {string.Join(", ", points.Select(p => $"(x: {p.X}, y: {p.Y})"))}");
+
         if ((points.Length - 1) % 3 != 0)
             throw new ArgumentException("points must be a valid set of control points for a cubic bezier spline", nameof(points));
 
@@ -106,7 +107,8 @@ public sealed class ShapeshifterPath : Entity
 [Tracked]
 public class Shapeshifter : Solid
 {
-    public int ID { get; }
+    private EntityID entityID;
+    public int ID => entityID.ID;
 
     private readonly char[,,] voxel;
     private readonly int width, height, depth;
@@ -130,11 +132,15 @@ public class Shapeshifter : Solid
     }
     private readonly MultiRoomBehavior multiRoomBehavior;
 
+    // set by the path processor if this is one of the shapeshifters loaded immediately on map load.
+    // this is to allow attaching to multi-room paths without the player first loading the room the shapeshifter is in
+    private readonly bool forceLoaded;
+
     private Coroutine sequenceRoutine;
 
     public Shapeshifter(EntityData data, Vector2 offset, EntityID id)
         : this(
-            id.ID, data.Position + offset,
+            id, data.Position + offset,
             data.Int("voxelWidth", 1), data.Int("voxelHeight", 1), data.Int("voxelDepth", 1),
             data.Attr("model", string.Empty), data.Char("defaultTile", '0'),
             data.Attr("startSound", SFX.game_10_quake_rockbreak),
@@ -142,12 +148,13 @@ public class Shapeshifter : Solid
             data.Float("startShake", 0.2f), data.Float("finishShake", 0.2f),
             data.Float("rainbowMix", 0.2f),
             data.Int("surfaceSoundIndex", SurfaceIndex.Asphalt),
-            (MultiRoomBehavior) data.Int("multiRoomBehavior", 0)
+            (MultiRoomBehavior) data.Int("multiRoomBehavior", 0),
+            data.Bool("forceLoaded", false)
         )
     { }
 
     public Shapeshifter(
-        int id, Vector2 position,
+        EntityID id, Vector2 position,
         int width, int height, int depth,
         string model, char defaultTile = '0',
         string startSound = SFX.game_10_quake_rockbreak,
@@ -155,11 +162,14 @@ public class Shapeshifter : Solid
         float startShake = 0.2f, float finishShake = 0.2f,
         float rainbowMix = 0.2f,
         int surfaceSoundIndex = SurfaceIndex.Asphalt,
-        MultiRoomBehavior multiRoomBehavior = MultiRoomBehavior.None
+        MultiRoomBehavior multiRoomBehavior = MultiRoomBehavior.None,
+        bool forceLoaded = false
     )
         : base(position, 0, 0, safe: true)
     {
-        ID = id;
+        Util.Log($"loaded shapeshifter id {id.ID} at x: {position.X}, y: {position.Y}");
+
+        entityID = id;
 
         this.width = width;
         this.height = height;
@@ -201,6 +211,7 @@ public class Shapeshifter : Solid
         SurfaceSoundIndex = surfaceSoundIndex;
 
         this.multiRoomBehavior = multiRoomBehavior;
+        this.forceLoaded = forceLoaded;
     }
 
     private void BuildCollider()
@@ -251,17 +262,30 @@ public class Shapeshifter : Solid
         //sfx.Position = Center - Position;
     }
 
-    public override void Awake(Scene scene)
+    public override void Added(Scene scene)
     {
-        base.Awake(scene);
+        base.Added(scene);
 
         if (multiRoomBehavior != MultiRoomBehavior.None)
         {
             Tag |= Tags.Global;
-            if (!FindPath().Item1?.MultiRoom ?? true)
+            bool foundGlobalPath = FindPath().Item1?.MultiRoom ?? false; // we know paths have been loaded already so this is fine
+            if (!foundGlobalPath)
             {
                 Tag &= ~Tags.Global;
+                if (forceLoaded)
+                {
+                    // the entire point of being force loaded was to attach to global paths. we have failed
+                    RemoveSelf();
+                    return;
+                }
             }
+        }
+
+        if (forceLoaded)
+        {
+            // we have loaded successfully! do not try and load this again on the normal level load pass
+            // (scene as Level).Session.DoNotLoad.Add(entityID);
         }
     }
 

@@ -116,6 +116,8 @@ public class CommunalHelperModule : EverestModule
         PoisonGas.Load();
         AffectSpriteTrigger.Load();
 
+        ShapeshifterPathProcessor.Load();
+
         #region Imports
 
         typeof(Imports.CavernHelper).ModInterop();
@@ -210,6 +212,8 @@ public class CommunalHelperModule : EverestModule
         AffectSpriteTrigger.Unload();
 
         LaserEmitter.Unload();
+
+        ShapeshifterPathProcessor.Unload();
     }
 
     public override void Initialize()

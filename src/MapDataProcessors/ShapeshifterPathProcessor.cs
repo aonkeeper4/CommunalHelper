@@ -1,16 +1,31 @@
+using MonoMod.Utils;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace Celeste.Mod.CommunalHelper.MapDataProcessors;
 
+// todo: move shapeshifter donotload to here ??? how
+// umm also  fix offsets i think since we're loading from 1st level pos instead of (0,0)
+// waitt i think i need to refactor the processing into the loadlevel hook as well cus otherwise the dictionaries are emptyy :(
+// gravityhelper does it .  so
+// if i'm doing that im gonna shove this into a class in the shapeshifter fileeee
 public class ShapeshifterPathProcessor : EverestMapDataProcessor
 {
+    // dictionaries for merging shapeshifter paths
+
     // shapeshifterPaths[AreaSID][ModeID][parentPathID] = list of child extension ids
     private static Dictionary<string, List<Dictionary<int, List<int>>>> shapeshifterPaths = new();
     // childAdoptionPool[AreaSID][ModeID][parentID] = child it needs to adopt
     private static Dictionary<string, List<Dictionary<int, List<int>>>> childAdoptionPool = new();
     // shapeshifterPaths[AreaSID][ModeID][pathID] = (room element, path element)
     private static Dictionary<string, List<Dictionary<int, (BinaryPacker.Element, BinaryPacker.Element)>>> pathsByID = new();
+
+    // dictionaries for loading entities immediately on map load
+
+    // allGlobalPaths[AreaSID][ModeID] = list of global paths
+    private static Dictionary<string, List<List<BinaryPacker.Element>>> allGlobalPaths = new();
+    // allShapeshifters[AreaSID][ModeID] = list of shapeshifters
+    private static Dictionary<string, List<List<BinaryPacker.Element>>> allShapeshifters = new();
 
     public override Dictionary<string, Action<BinaryPacker.Element>> Init()
     {
@@ -21,6 +36,24 @@ public class ShapeshifterPathProcessor : EverestMapDataProcessor
 
         BinaryPacker.Element currentRoom = new();
         void roomProcessor(BinaryPacker.Element room) => currentRoom = room;
+
+        void shapeshifterProcessor(BinaryPacker.Element shapeshifter)
+        {
+            // clone the shapeshifter to not modify original
+            BinaryPacker.Element newShapeshifter = new()
+            {
+                Package = shapeshifter.Package,
+                Name = shapeshifter.Name,
+                Attributes = new(shapeshifter.Attributes ?? new()),
+                Children = new(shapeshifter.Children ?? new())
+            };
+            // since we are loading these on map load, they will not have the correct position data as they are not loaded with the room they were originally placed in.
+            // so here, we set the x and y attributes to their current world position and when loading, we set the offset (room position) to 0, 0.
+            newShapeshifter.SetAttr("x", newShapeshifter.AttrFloat("x") + currentRoom.AttrInt("x"));
+            newShapeshifter.SetAttr("y", newShapeshifter.AttrFloat("y") + currentRoom.AttrInt("y"));
+
+            allShapeshifters[sid][mode].Add(newShapeshifter);
+        }
 
         void shapeshifterPathProcessor(BinaryPacker.Element shapeshifterPath)
         {
@@ -134,8 +167,9 @@ public class ShapeshifterPathProcessor : EverestMapDataProcessor
 
         return new Dictionary<string, Action<BinaryPacker.Element>>() {
             {"level", roomProcessor},
+            {"entity:CommunalHelper/Shapeshifter", shapeshifterProcessor},
             {"entity:CommunalHelper/ShapeshifterPath",  shapeshifterPathProcessor},
-            {"entity:CommunalHelper/ShapeshifterPathExtension",  shapeshifterPathExtensionProcessor}
+            {"entity:CommunalHelper/ShapeshifterPathExtension",  shapeshifterPathExtensionProcessor},
         };
     }
 
@@ -146,6 +180,9 @@ public class ShapeshifterPathProcessor : EverestMapDataProcessor
         ResetMapDataDict(ref shapeshifterPaths);
         ResetMapDataDict(ref childAdoptionPool);
         ResetMapDataDict(ref pathsByID);
+
+        ResetMapDataDict(ref allGlobalPaths);
+        ResetMapDataDict(ref allShapeshifters);
     }
 
     private void ResetMapDataDict<T>(ref Dictionary<string, List<T>> dict) where T : new()
@@ -205,7 +242,20 @@ public class ShapeshifterPathProcessor : EverestMapDataProcessor
             }
 
             parent.SetAttr("shapeshifterAttachIndices", string.Join(",", attachIndices));
-            parent.SetAttr("multiRoom", multiRoom);
+            if (multiRoom)
+            {
+                parent.SetAttr("multiRoom", true);
+                // since we are loading these on map load, they will not have the correct position data as they are not loaded with the room they were originally placed in.
+                // so here, we set the x and y attributes to their current world position and when loading, we set the offset (room position) to 0, 0.
+                parent.SetAttr("x", parent.AttrFloat("x") + parentRoomX);
+                parent.SetAttr("y", parent.AttrFloat("y") + parentRoomY);
+                foreach (BinaryPacker.Element node in parent.Children)
+                {
+                    node.SetAttr("x", node.AttrFloat("x") + parentRoomX);
+                    node.SetAttr("y", node.AttrFloat("y") + parentRoomY);
+                }
+                allGlobalPaths[sid][mode].Add(parent);
+            }
         }
     }
 
@@ -221,4 +271,55 @@ public class ShapeshifterPathProcessor : EverestMapDataProcessor
             }
         };
     }
+
+    #region Hooks
+
+    internal static void Load()
+    {
+        On.Celeste.Level.LoadLevel += Level_LoadLevel;
+    }
+
+    internal static void Unload()
+    {
+        On.Celeste.Level.LoadLevel -= Level_LoadLevel;
+    }
+
+    // add all global paths and shapeshifters to the scene immediately on map load.
+    // this is to allow shapeshifters attaching to multi-room paths without the player first loading the room the shapeshifter is in
+    private static void Level_LoadLevel(On.Celeste.Level.orig_LoadLevel orig, Level self, Player.IntroTypes playerIntro, bool isFromLoader)
+    {
+        if (!isFromLoader)
+        {
+            orig(self, playerIntro, true);
+            return;
+        }
+
+        string sid = self.Session.Area.SID;
+        int mode = (int) self.Session.Area.Mode;
+
+        foreach (BinaryPacker.Element path in allGlobalPaths[sid][mode])
+        {
+            EntityData data = CreateDataFromElement(self, path);
+            // do not load this on the normal level load pass
+            self.Session.DoNotLoad.Add(new EntityID(data.Level.Name, data.ID));
+            Level.LoadCustomEntity(data, self);
+        }
+
+        foreach (BinaryPacker.Element shapeshifter in allShapeshifters[sid][mode])
+        {
+            shapeshifter.SetAttr("forceLoaded", true);
+            EntityData data = CreateDataFromElement(self, shapeshifter);
+            // Session.DoNotLoad logic handled in Shapeshifter.Added
+            // wait i think Added is called after everything has been added, so there are  2 of them
+            // bwuhh how do i DoNotLoad it hereee
+            Level.LoadCustomEntity(data, self);
+        }
+
+        orig(self, playerIntro, true);
+    }
+
+    private static EntityData CreateDataFromElement(Level level, BinaryPacker.Element entity) =>
+        DynamicData.For(level.Session.LevelData).Invoke<EntityData>("CreateEntityData", entity); // reflection :frowner:
+
+    #endregion
 }

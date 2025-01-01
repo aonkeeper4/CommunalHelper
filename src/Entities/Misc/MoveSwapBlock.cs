@@ -1017,9 +1017,9 @@ public class MoveSwapBlock : SwapBlock
                 middleImage.RenderPosition = pos + new Vector2(width / 2f, height / 2f) + middleOffsets[value];
                 middleImage.Render();
 
-                if (block.groupable.Group is MoveBlockGroup group)
+                if (block.groupable.Group is not null)
                 {
-                    block.middleArrowHighlight.Color = Color.Lerp(Color.Transparent, group.Color, Calc.SineMap(block.Scene.TimeActive * 3, 0, 1));
+                    block.middleArrowHighlight.Color = block.groupable.HighlightColor();
                     block.middleArrowHighlight.Render();
                 }
             }

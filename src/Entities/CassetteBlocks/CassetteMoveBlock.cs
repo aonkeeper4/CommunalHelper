@@ -468,7 +468,7 @@ public class CassetteMoveBlock : CustomCassetteBlock
 
         if (shouldShowHighlight)
         {
-            Color highlightColor = Color.Lerp(Color.Transparent, groupable.Group.Color, Calc.SineMap(Scene.TimeActive * 3, 0, 1));
+            Color highlightColor = groupable.HighlightColor();
             arrowHighlight.Color = arrowHighlightPressed.Color = crossHighlight.Color = crossHighlightPressed.Color = highlightColor;
         }
     }

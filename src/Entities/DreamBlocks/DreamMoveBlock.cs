@@ -720,9 +720,7 @@ public class DreamMoveBlock : CustomDreamBlock
         MTexture currentTex = groupable.State != GroupableMoveBlock.MovementState.Breaking
             ? arrows[Calc.Clamp(value, 0, 7)]
             : GFX.Game["objects/CommunalHelper/dreamMoveBlock/x"];
-        currentTex.DrawCentered(Center + baseData.Get<Vector2>("shake"), groupable.Group is null
-            ? currentArrowColor
-            : Color.Lerp(currentArrowColor, groupable.Group.Color, Calc.SineMap(Scene.TimeActive * 3, 0, 1)));
+        currentTex.DrawCentered(Center + baseData.Get<Vector2>("shake"), groupable.HighlightColor(currentArrowColor));
 
         float num = flash * 4f;
         Draw.Rect(X - num, Y - num, Width + (num * 2f), Height + (num * 2f), Color.White * flash);

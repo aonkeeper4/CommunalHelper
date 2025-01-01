@@ -791,9 +791,7 @@ public class ConnectedMoveBlock : ConnectedSolid
         int arrowIndex = Calc.Clamp((int) Math.Floor(((0f - angle + ((float) Math.PI * 2f)) % ((float) Math.PI * 2f) / ((float) Math.PI * 2f) * 8f) + 0.5f), 0, 7);
         foreach (Hitbox hitbox in ArrowsList)
         {
-            Color arrowColor = groupable.Group is null
-                ? fillColor
-                : Color.Lerp(fillColor, groupable.Group.Color, Calc.SineMap(Scene.TimeActive * 3, 0, 1));
+            Color arrowColor = groupable.HighlightColor(fillColor);
 
             Vector2 vec = hitbox.Center + Position;
             Draw.Rect(vec.X - 4f, vec.Y - 4f, 8f, 8f, arrowColor);

@@ -168,7 +168,7 @@ public class MoveSwapBlock : SwapBlock
         angleSteerSign = angle > 0f ? -1 : 1;
 
         Add(groupable = new GroupableMoveBlock());
-        
+
         crashTime = data.Float("crashTime", 0.15f);
         regenTime = data.Float("regenTime", 3f);
         shakeOnCollision = data.Bool("shakeOnCollision", true);
@@ -219,6 +219,10 @@ public class MoveSwapBlock : SwapBlock
             OnBreakAction = (coroutine) =>
             {
                 groupable.State = GroupableMoveBlock.MovementState.Breaking;
+                MoveBlockRedirectable.GetControllerDelegate(dynamicData, 5)(coroutine);
+            },
+            OnResumeAction = (coroutine) =>
+            {
                 MoveBlockRedirectable.GetControllerDelegate(dynamicData, 4)(coroutine);
             },
         });

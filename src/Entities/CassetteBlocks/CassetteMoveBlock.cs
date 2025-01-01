@@ -1,5 +1,6 @@
 ﻿using Celeste.Mod.CommunalHelper.Components;
 using FMOD.Studio;
+using MonoMod.Utils;
 using System.Collections;
 using System.Collections.Generic;
 using Directions = Celeste.MoveBlock.Directions;
@@ -81,7 +82,12 @@ public class CassetteMoveBlock : CustomCassetteBlock
         P_Break = new ParticleType(MoveBlock.P_Break) { Color = color };
         P_BreakPressed = new ParticleType(MoveBlock.P_Break) { Color = pressedColor };
 
-        Add(new MoveBlockRedirectable(new MonoMod.Utils.DynamicData(this), () => false, () => Direction, dir =>
+        DynamicData dynamicData = new(this);
+        Add(new MoveBlockRedirectable(
+            dynamicData,
+            () => false,
+            () => Direction,
+            dir =>
             {
                 int index = (int) Math.Floor(((0f - angle + ((float) Math.PI * 2f)) % ((float) Math.PI * 2f) / ((float) Math.PI * 2f) * 8f) + 0.5f);
                 arrow.Texture = GFX.Game.GetAtlasSubtextures("objects/CommunalHelper/cassetteMoveBlock/arrow")[index];
@@ -90,7 +96,23 @@ public class CassetteMoveBlock : CustomCassetteBlock
                 arrowHighlightPressed.Texture = GFX.Game.GetAtlasSubtextures("objects/CommunalHelper/cassetteMoveBlock/arrowHighlightPressed")[index];
                 Direction = dir;
             }
-        ));
+        )
+        {
+            Get_Speed = () => moveSpeed,
+            Set_Speed = (speed) => moveSpeed = speed,
+            Get_TargetSpeed = () => targetSpeed,
+            Set_TargetSpeed = (targetSpeed) => this.targetSpeed = targetSpeed,
+            Get_MoveSfx = () => moveSfx,
+            OnBreakAction = (coroutine) =>
+            {
+                groupable.State = GroupableMoveBlock.MovementState.Breaking;
+                MoveBlockRedirectable.GetControllerDelegate(dynamicData, 5)(coroutine);
+            },
+            OnResumeAction = (coroutine) =>
+            {
+                MoveBlockRedirectable.GetControllerDelegate(dynamicData, 4)(coroutine);
+            },
+        });
     }
 
     public CassetteMoveBlock(EntityData data, Vector2 offset, EntityID id)

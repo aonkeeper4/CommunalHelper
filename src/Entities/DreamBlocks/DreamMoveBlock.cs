@@ -4,6 +4,7 @@ using Mono.Cecil;
 using Mono.Cecil.Cil;
 using MonoMod.Cil;
 using MonoMod.RuntimeDetour;
+using MonoMod.Utils;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -196,11 +197,24 @@ public class DreamMoveBlock : CustomDreamBlock
 
         Add(groupable = new GroupableMoveBlock());
 
-        Add(new MoveBlockRedirectable(new MonoMod.Utils.DynamicData(this),
-            () => false,
-            () => direction,
-            dir => direction = dir
-        ));
+        DynamicData dynamicData = new(this);
+        Add(new MoveBlockRedirectable(dynamicData, () => false, () => direction, dir => direction = dir)
+        {
+            Get_Speed = () => speed,
+            Set_Speed = (speed) => this.speed = speed,
+            Get_TargetSpeed = () => targetSpeed,
+            Set_TargetSpeed = (targetSpeed) => this.targetSpeed = targetSpeed,
+            Get_MoveSfx = () => moveSfx,
+            OnBreakAction = (coroutine) =>
+            {
+                groupable.State = GroupableMoveBlock.MovementState.Breaking;
+                MoveBlockRedirectable.GetControllerDelegate(dynamicData, 5)(coroutine);
+            },
+            OnResumeAction = (coroutine) =>
+            {
+                MoveBlockRedirectable.GetControllerDelegate(dynamicData, 4)(coroutine);
+            },
+        });
 
         int num = data.Width / 8;
         int num2 = data.Height / 8;
@@ -420,7 +434,7 @@ public class DreamMoveBlock : CustomDreamBlock
             float debrisMoveTime = Calc.Clamp(regenTime, 0, 0.6f);
 
             yield return waitTime;
-            
+
             yield return new SwapImmediately(groupable.WaitForRespawn());
 
             foreach (MoveBlockDebris d in debris)

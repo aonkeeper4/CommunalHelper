@@ -36,10 +36,12 @@ public class MoveSwapBlock : SwapBlock
     private readonly Image middleArrow;
     private readonly MTexture middleCardinal;
     private readonly MTexture middleDiagonal;
+    private readonly MTexture middleCross;
 
     private readonly Image middleArrowHighlight;
     private readonly MTexture middleCardinalHighlight;
     private readonly MTexture middleDiagonalHighlight;
+    private readonly MTexture middleCrossHighlight;
 
     private Entity path;
 
@@ -145,10 +147,12 @@ public class MoveSwapBlock : SwapBlock
         // Replace/Add SwapBlock textures
         middleCardinal = GFX.Game["objects/CommunalHelper/moveSwapBlock/midBlockCardinal"];
         middleDiagonal = GFX.Game["objects/CommunalHelper/moveSwapBlock/midBlockDiagonal"];
+        middleCross = GFX.Game["objects/CommunalHelper/moveSwapBlock/midBlockCross"];
         Add(middleArrow = new Image(middleCardinal));
         middleArrow.CenterOrigin();
         middleCardinalHighlight = GFX.Game["objects/CommunalHelper/moveSwapBlock/midBlockCardinalHighlight"];
         middleDiagonalHighlight = GFX.Game["objects/CommunalHelper/moveSwapBlock/midBlockDiagonalHighlight"];
+        middleCrossHighlight = GFX.Game["objects/CommunalHelper/moveSwapBlock/midBlockCrossHighlight"];
         Add(middleArrowHighlight = new Image(middleCardinalHighlight));
         middleArrowHighlight.CenterOrigin();
 
@@ -1006,7 +1010,6 @@ public class MoveSwapBlock : SwapBlock
                 if (block.groupable.State == GroupableMoveBlock.MovementState.Moving && !block.Swapping && (block.Position == block.start || block.Position == block.end))
                     middleImage = block.middleOrange;
 
-
                 block.middleArrow.Texture = value % 2 == 0 ? block.middleCardinal : block.middleDiagonal;
                 block.middleArrowHighlight.Texture = value % 2 == 0 ? block.middleCardinalHighlight : block.middleDiagonalHighlight;
                 block.middleArrow.RenderPosition = block.middleArrowHighlight.RenderPosition = pos + new Vector2(width / 2f, height / 2f);
@@ -1016,22 +1019,23 @@ public class MoveSwapBlock : SwapBlock
                 middleImage.Color = color;
                 middleImage.RenderPosition = pos + new Vector2(width / 2f, height / 2f) + middleOffsets[value];
                 middleImage.Render();
-
-                if (block.groupable.Group is not null)
-                {
-                    block.middleArrowHighlight.Color = block.groupable.HighlightColor();
-                    block.middleArrowHighlight.Render();
-                }
             }
             else
             {
-                block.middleArrow.Texture = GFX.Game["objects/CommunalHelper/moveSwapBlock/midBlockCross"];
-                block.middleArrow.RenderPosition = pos + new Vector2(width / 2f, height / 2f);
+                block.middleArrow.Texture = block.middleCross;
+                block.middleArrowHighlight.Texture = block.middleCrossHighlight;
+                block.middleArrow.RenderPosition = block.middleArrowHighlight.RenderPosition = pos + new Vector2(width / 2f, height / 2f);
                 block.middleArrow.Render();
 
                 middle.Color = Color.Black;
                 middle.RenderPosition = pos + new Vector2(width / 2f, height / 2f);
                 middle.Render();
+            }
+
+            if (block.groupable.Group is not null)
+            {
+                block.middleArrowHighlight.Color = block.groupable.HighlightColor();
+                block.middleArrowHighlight.Render();
             }
         }
     }

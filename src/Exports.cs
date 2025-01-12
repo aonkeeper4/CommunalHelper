@@ -33,19 +33,9 @@ public static class ModExports
             return DreamTunnelDash.DreamTunnelDashCount;
         }
 
-        public static bool DreamTunnelDashAttacking()
-        {
-            return DreamTunnelDash.DreamTunnelDashAttacking;
-        }
-
         public static Component DreamTunnelInteraction(Action<Player> onPlayerEnter, Action<Player> onPlayerExit)
         {
             return new DreamTunnelInteraction(onPlayerEnter, onPlayerExit);
-        }
-
-        public static Component DreamTunnelCollider(Collider collider)
-        {
-            return new DreamTunnelCollider(collider);
         }
 
         #endregion

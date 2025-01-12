@@ -185,7 +185,9 @@ public static class DreamTunnelDash
             DynamicData playerData = player.GetData();
             Vector2 lastAim = Input.GetAimVector(player.Facing);
             Vector2 dir = lastAim.Sign();
-            if (!player.CollideCheck<Solid, DreamBlock>() && player.CollideCheck<Solid, DreamBlock>(player.Position + dir))
+            bool testSolids = !player.CollideCheck<Solid, DreamBlock>() && player.CollideCheck<Solid, DreamBlock>(player.Position + dir);
+            bool testColliders = player.Scene.Tracker.GetComponents<DreamTunnelCollider>().Cast<DreamTunnelCollider>().Any(c => !c.Check(player) && c.Check(player, dir));
+            if (testSolids || testColliders)
             {
                 player.Speed = player.DashDir = lastAim;
                 player.MoveHExact((int) dir.X, playerData.Get<Collision>("onCollideH"));
@@ -580,7 +582,9 @@ public static class DreamTunnelDash
                     for (int i = -1; i >= -Player_DashCornerCorrection; i--)
                     {
                         Vector2 at = player.Position + dir + (side * i);
-                        if (!player.CollideCheck<DreamBlock>(at) && (solid = player.CollideFirst<Solid, DreamBlock>(at)) != null)
+                        solid = player.CollideFirst<Solid, DreamBlock>(at);
+                        solid ??= player.Scene.Tracker.GetComponents<DreamTunnelCollider>().Cast<DreamTunnelCollider>().FirstOrDefault(c => c.Check(player, dir + (side * i)))?.Dummy;
+                        if (!player.CollideCheck<DreamBlock>(at) && solid != null)
                         {
                             player.Position += side * i;
                             dashedIntoDreamBlock = false;
@@ -594,7 +598,9 @@ public static class DreamTunnelDash
                     for (int i = 1; i <= Player_DashCornerCorrection; i++)
                     {
                         Vector2 at = player.Position + dir + (side * i);
-                        if (!player.CollideCheck<DreamBlock>(at) && (solid = player.CollideFirst<Solid, DreamBlock>(at)) != null)
+                        solid = player.CollideFirst<Solid, DreamBlock>(at);
+                        solid ??= player.Scene.Tracker.GetComponents<DreamTunnelCollider>().Cast<DreamTunnelCollider>().FirstOrDefault(c => c.Check(player, dir + (side * i)))?.Dummy;
+                        if (!player.CollideCheck<DreamBlock>(at) && solid != null)
                         {
                             player.Position += side * i;
                             dashedIntoDreamBlock = false;
@@ -616,6 +622,7 @@ public static class DreamTunnelDash
             }
 
             solid ??= player.CollideFirst<Solid, DreamBlock>(player.Position + dir);
+            solid ??= player.Scene.Tracker.GetComponents<DreamTunnelCollider>().Cast<DreamTunnelCollider>().FirstOrDefault(c => c.Check(player, dir))?.Dummy;
             // Don't dash through if it has a dash collide action, unless it's a farewell floaty block
             // or a DashBlock which is only breakable by a Kevin (canDash is false)
             if (solid != null && (!CommunalHelperModule.Settings.DreamTunnelIgnoreCollidables

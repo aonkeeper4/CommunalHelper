@@ -45,7 +45,7 @@ public class DreamTunnelCollider : Component
     /// Checks if the player is colliding with this component.
     /// </summary>
     /// <param name="player">The player instance.</param>
-    internal bool Check(Player player)
+    public bool Check(Player player, Vector2? dir = null)
     {
         // no need for a Player_canEnterDreamTunnelCollider check like DreamDashCollider, as DreamTunnelDashAttacking is enough
         // the check is necessary in DreamDashCollider because some things give dash attack without the player needing to (be able to) dash
@@ -54,7 +54,7 @@ public class DreamTunnelCollider : Component
             Collider collider = Entity.Collider;
 
             Entity.Collider = Collider;
-            bool check = player.CollideCheck(Entity);
+            bool check = player.CollideCheck(Entity, player.Position + (dir ?? Vector2.Zero));
             Entity.Collider = collider;
 
             return check;

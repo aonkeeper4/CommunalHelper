@@ -23,7 +23,9 @@ public static class DreamTunnelDash
 
         // Extra correction for fast moving solids, this does not cause issues with dashdir leniency
         Vector2 dir = player.DashDir.Sign();
-        if (!player.CollideCheck<Solid, DreamBlock>() && player.CollideCheck<Solid, DreamBlock>(player.Position + dir))
+        bool testSolids = !player.CollideCheck<Solid, DreamBlock>() && player.CollideCheck<Solid, DreamBlock>(player.Position + dir);
+        bool testColliders = player.Scene.Tracker.GetComponents<DreamTunnelCollider>().Cast<DreamTunnelCollider>().Any(c => !c.Check(player) && c.Check(player, dir));
+        if (testSolids || testColliders)
         {
             player.NaiveMove(dir);
         }

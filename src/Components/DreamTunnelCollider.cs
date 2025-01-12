@@ -65,7 +65,13 @@ public class DreamTunnelCollider : Component
     public override void Update()
     {
         base.Update();
-        if (Util.TryGetPlayer(out Player player) && Check(player) && DreamTunnelDash.DreamTunnelDashAttacking && player.Speed != Vector2.Zero && player.StateMachine.State != St.DreamTunnelDash)
+        if (
+            Util.TryGetPlayer(out Player player) &&
+            Check(player) &&
+            DreamTunnelDash.DreamTunnelDashAttacking && player.DashAttacking &&
+            player.Speed != Vector2.Zero &&
+            player.StateMachine.State != St.DreamTunnelDash
+        )
         {
             player.StateMachine.State = St.DreamTunnelDash;
             Dummy.Components.GetAll<DreamTunnelInteraction>().ToList().ForEach(i => i.OnPlayerEnter(player));

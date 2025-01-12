@@ -34,7 +34,7 @@ public static class DreamTunnelDash
         set => dreamTunnelDashCount = value;
     }
     private static bool canStartDreamTunnelDashAttack = false;
-    private static bool dreamTunnelDashAttacking;
+    public static bool DreamTunnelDashAttacking { get; private set; }
     private static float dreamTunnelDashTimer;
 
     private static bool nextDashFeather;
@@ -170,14 +170,14 @@ public static class DreamTunnelDash
     {
         orig(player, position, spriteMode);
         canStartDreamTunnelDashAttack = false;
-        dreamTunnelDashAttacking = false;
+        DreamTunnelDashAttacking = false;
     }
 
     private static void StartDreamTunnelDashAttacking(Player player)
     {
         if (canStartDreamTunnelDashAttack)
         {
-            dreamTunnelDashAttacking = true;
+            DreamTunnelDashAttacking = true;
             dreamTunnelDashTimer = player.GetData().Get<float>("dashAttackTimer");
 
             // Ensures the player enters the dream tunnel dash state if dashing into a fast moving block
@@ -227,7 +227,7 @@ public static class DreamTunnelDash
     // DreamTunnelDash trail recoloring
     private static void Player_CreateTrail(On.Celeste.Player.orig_CreateTrail orig, Player player)
     {
-        if (dreamTunnelDashAttacking)
+        if (DreamTunnelDashAttacking)
         {
             player.CreateDreamTrail();
         }
@@ -262,7 +262,7 @@ public static class DreamTunnelDash
          */
         cursor.GotoNext(MoveType.After, instr => instr.MatchLdfld<Player>("onGround"));
         cursor.Emit(cursor.Next.OpCode, cursor.Next.Operand);
-        cursor.Emit(OpCodes.Ldsfld, typeof(DreamTunnelDash).GetField(nameof(dreamTunnelDashAttacking), BindingFlags.NonPublic | BindingFlags.Static));
+        cursor.Emit(OpCodes.Call, typeof(DreamTunnelDash).GetMethod("get_DreamTunnelDashAttacking", BindingFlags.Public | BindingFlags.Static));
         cursor.Next.OpCode = OpCodes.Brtrue;
     }
 
@@ -277,7 +277,7 @@ public static class DreamTunnelDash
             dreamTunnelDashTimer -= Engine.DeltaTime;
 
         if (dreamTunnelDashTimer <= 0f)
-            dreamTunnelDashAttacking = false;
+            DreamTunnelDashAttacking = false;
 
         if (DreamTunnelDashCount > 0 && self.Scene.OnInterval(0.1f / DreamTunnelDashCount))
             self.CreateDreamTrail();
@@ -452,14 +452,14 @@ public static class DreamTunnelDash
     private static void Level_Reload(On.Celeste.Level.orig_Reload orig, Level self)
     {
         DreamTunnelDashCount = 0;
-        dreamTunnelDashAttacking = false;
+        DreamTunnelDashAttacking = false;
         orig(self);
     }
 
     private static void LevelLoader_StartLevel(On.Celeste.LevelLoader.orig_StartLevel orig, LevelLoader self)
     {
         DreamTunnelDashCount = 0;
-        dreamTunnelDashAttacking = false;
+        DreamTunnelDashAttacking = false;
         orig(self);
     }
 
@@ -558,7 +558,7 @@ public static class DreamTunnelDash
             dashdir.Y *= -1;
         }
 
-        if (dreamTunnelDashAttacking && player.DashAttacking && (dir.X == Math.Sign(dashdir.X) || dir.Y == Math.Sign(dashdir.Y)))
+        if (DreamTunnelDashAttacking && player.DashAttacking && (dir.X == Math.Sign(dashdir.X) || dir.Y == Math.Sign(dashdir.Y)))
         {
             Rectangle bounds = player.SceneAs<Level>().Bounds;
             if (player.Left + dir.X < bounds.Left || player.Right + dir.X > bounds.Right || player.Top + dir.Y < bounds.Top || player.Bottom + dir.Y > bounds.Bottom)
@@ -609,7 +609,7 @@ public static class DreamTunnelDash
                     if (DynamicData.For(block).Get<bool>("playerHasDreamDash"))
                         player.Die(-dir);
 
-                    dreamTunnelDashAttacking = false;
+                    DreamTunnelDashAttacking = false;
                     overrideDreamDashCheck = true;
                     return false;
                 }
@@ -639,7 +639,7 @@ public static class DreamTunnelDash
                 // tile behind it. In order to prevent this from making you dash
                 // through a wall after hitting a button, I disable the dream
                 // tunnel after hitting a button.
-                dreamTunnelDashAttacking = false;
+                DreamTunnelDashAttacking = false;
             }
         }
         return false;

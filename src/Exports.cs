@@ -38,6 +38,11 @@ public static class ModExports
             return new DreamTunnelInteraction(onPlayerEnter, onPlayerExit);
         }
 
+        public static Component DreamTunnelCollider(Collider collider)
+        {
+            return new DreamTunnelCollider(collider);
+        }
+
         #endregion
 
         #region Seeker
@@ -54,5 +59,4 @@ public static class ModExports
 
         #endregion
     }
-
 }

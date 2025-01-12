@@ -173,6 +173,7 @@ public static class DreamTunnelDash
             playerData.Set(Player_dreamTunnelDashCanEndTimer, dreamDashCanEndTimer - Engine.DeltaTime);
         }
         Solid solid = player.CollideFirst<Solid, DreamBlock>();
+        solid ??= player.Scene.Tracker.GetComponents<DreamTunnelCollider>().Cast<DreamTunnelCollider>().FirstOrDefault(c => c.Check(player))?.Dummy;
         if (solid == null)
         {
             if (player.DreamTunneledIntoDeath())

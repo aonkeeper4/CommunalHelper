@@ -174,8 +174,10 @@ public static class DreamTunnelDash
         {
             playerData.Set(Player_dreamTunnelDashCanEndTimer, dreamDashCanEndTimer - Engine.DeltaTime);
         }
+
         Solid solid = player.CollideFirst<Solid, DreamBlock>();
         solid ??= player.Scene.Tracker.GetComponents<DreamTunnelCollider>().Cast<DreamTunnelCollider>().FirstOrDefault(c => c.Check(player))?.Dummy;
+
         if (solid == null)
         {
             if (player.DreamTunneledIntoDeath())
@@ -219,6 +221,13 @@ public static class DreamTunnelDash
         }
         else
         {
+            Solid oldSolid = playerData.Get<Solid>(Player_solid);
+            if (solid != oldSolid)
+            {
+                oldSolid?.Components?.GetAll<DreamTunnelInteraction>()?.ToList()?.ForEach(i => { if (i.EvenIfIntermediate) { i.OnPlayerExit(player); } });
+                solid?.Components?.GetAll<DreamTunnelInteraction>()?.ToList()?.ForEach(i => { if (i.EvenIfIntermediate) { i.OnPlayerEnter(player); } });
+            }
+
             playerData.Set(Player_solid, solid);
             if (player.Scene.OnInterval(0.1f))
             {

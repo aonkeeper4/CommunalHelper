@@ -38,6 +38,11 @@ public static class ModExports
             return new DreamTunnelInteraction(onPlayerEnter, onPlayerExit);
         }
 
+        public static Component DreamTunnelInteraction(Action<Player> onPlayerEnter, Action<Player> onPlayerExit, bool evenIfIntermediate)
+        {
+            return new DreamTunnelInteraction(onPlayerEnter, onPlayerExit, evenIfIntermediate);
+        }
+
         #endregion
 
         #region Seeker

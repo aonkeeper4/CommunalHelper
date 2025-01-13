@@ -1,12 +1,17 @@
 using Celeste.Mod.CommunalHelper.Entities;
 using Celeste.Mod.CommunalHelper.States;
+using MonoMod.Utils;
 using System.Linq;
 using DreamTunnelDash = Celeste.Mod.CommunalHelper.DashStates.DreamTunnelDash;
 
 namespace Celeste.Mod.CommunalHelper.Components;
 
+// todo: 
+// normally the dreamtunneldash ignores jumpthrus, like if ur standing on one and also a solid and u dream dash down the jumpthru doesnt block u
+// update liftspeed correctly somehow like  u should be able to get liftboost through the collider as if it were a dreamblock
+
 /// <summary>
-/// Component that behaves as if it were a Solid collider during Dream Tunnel Dash.
+/// Collider component that behaves as if it were a Solid during Dream Tunnel Dash.
 /// </summary>
 [Tracked]
 public class DreamTunnelCollider : Component
@@ -26,8 +31,6 @@ public class DreamTunnelCollider : Component
 
     public Collider Collider;
     public ColliderDummy Dummy;
-
-    public DreamTunnelInteraction Interaction;
 
     public DreamTunnelCollider(Collider collider) : base(true, true)
     {
@@ -73,8 +76,12 @@ public class DreamTunnelCollider : Component
             player.StateMachine.State != St.DreamTunnelDash
         )
         {
+            DynamicData playerData = player.GetData();
             player.StateMachine.State = St.DreamTunnelDash;
             Dummy.Components.GetAll<DreamTunnelInteraction>().ToList().ForEach(i => i.OnPlayerEnter(player));
+            playerData.Set(DreamTunnelDash.Player_solid, Dummy);
+            playerData.Set("dashAttackTimer", 0f);
+            playerData.Set("gliderBoostTimer", 0f);
         }
     }
 

@@ -28,10 +28,14 @@ public class DreamTunnelCollider : Component
     public Collider Collider;
     public ColliderDummy Dummy;
 
-    public DreamTunnelCollider(Collider collider) : base(true, true)
+    private readonly bool ignoreEntityCollidable;
+
+    public DreamTunnelCollider(Collider collider, bool ignoreEntityCollidable = false) : base(true, true)
     {
         Collider = collider;
         Dummy = new(Entity, this);
+
+        this.ignoreEntityCollidable = ignoreEntityCollidable;
     }
 
     public override void Added(Entity entity)
@@ -51,10 +55,13 @@ public class DreamTunnelCollider : Component
         if (Active && Collider is not null && Entity != null)
         {
             Collider collider = Entity.Collider;
+            bool collidable = Entity.Collidable;
 
+            if (ignoreEntityCollidable) Entity.Collidable = true;
             Entity.Collider = Collider;
             bool check = player.CollideCheck(Entity, player.Position + (dir ?? Vector2.Zero));
             Entity.Collider = collider;
+            Entity.Collidable = collidable;
 
             return check;
         }

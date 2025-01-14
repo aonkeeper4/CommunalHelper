@@ -6,10 +6,6 @@ using DreamTunnelDash = Celeste.Mod.CommunalHelper.DashStates.DreamTunnelDash;
 
 namespace Celeste.Mod.CommunalHelper.Components;
 
-// todo: 
-// normally the dreamtunneldash ignores jumpthrus, like if ur standing on one and also a solid and u dream dash down the jumpthru doesnt block u
-// update liftspeed correctly somehow like  u should be able to get liftboost through the collider as if it were a dreamblock
-
 /// <summary>
 /// Collider component that behaves as if it were a Solid during Dream Tunnel Dash.
 /// </summary>

@@ -237,7 +237,21 @@ public static class DreamTunnelDash
             if (level.OnInterval(0.04f))
             {
                 DisplacementRenderer.Burst burst = level.Displacement.AddBurst(player.Center, 0.3f, 0f, 40f, 1f, null, null);
-                burst.WorldClipCollider = solid.Collider;
+                // since the ColliderDummy is a dummy solid, we have to set the WorldClipRect manually in order for displacement effects in a DreamTunnelCollider to work
+                if (solid is DreamTunnelCollider.ColliderDummy dummy)
+                {
+                    DreamTunnelCollider collider = dummy.DreamTunnelCollider;
+                    burst.WorldClipRect = new(
+                        (int) (collider.Collider.Left + collider.Entity.Position.X),
+                        (int) (collider.Collider.Top + collider.Entity.Position.Y),
+                        (int) collider.Collider.Width,
+                        (int) collider.Collider.Height
+                    );
+                }
+                else
+                {
+                    burst.WorldClipCollider = solid.Collider;
+                }
                 burst.WorldClipPadding = 2;
             }
         }

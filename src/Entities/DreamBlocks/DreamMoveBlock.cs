@@ -4,6 +4,7 @@ using Mono.Cecil;
 using Mono.Cecil.Cil;
 using MonoMod.Cil;
 using MonoMod.RuntimeDetour;
+using MonoMod.Utils;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,13 +15,6 @@ namespace Celeste.Mod.CommunalHelper.Entities;
 [CustomEntity("CommunalHelper/DreamMoveBlock")]
 public class DreamMoveBlock : CustomDreamBlock
 {
-    public enum MovementState
-    {
-        Idling,
-        Moving,
-        Breaking
-    }
-
     public static ParticleType P_Activate;
     public static ParticleType P_Break;
     public static ParticleType[] dreamParticles;
@@ -48,7 +42,8 @@ public class DreamMoveBlock : CustomDreamBlock
     private readonly float homeAngle;
     private readonly int angleSteerSign;
     internal Vector2 startPosition;
-    public MovementState state = MovementState.Idling;
+
+    private readonly GroupableMoveBlock groupable;
 
     private bool leftPressed;
 
@@ -83,6 +78,8 @@ public class DreamMoveBlock : CustomDreamBlock
     private Color breakingCrossColor = Calc.HexToColor("FFFFFF");
 
     private Color wobbleLineColor = Calc.HexToColor("FFFFFF");
+
+    private Color currentArrowColor;
 
     private float flash;
     private readonly SoundSource moveSfx;
@@ -191,16 +188,33 @@ public class DreamMoveBlock : CustomDreamBlock
             this.breakingCrossColor = Calc.HexToColor(data.Attr("breakingCrossColor"));
         }
 
+        this.currentArrowColor = this.idleArrowColor;
+
         arrows = GFX.Game.GetAtlasSubtextures("objects/CommunalHelper/dreamMoveBlock/arrow");
         Add(moveSfx = new SoundSource());
         Add(controller = new Coroutine(Controller()));
         Add(new LightOcclude(0.5f));
 
-        Add(new MoveBlockRedirectable(new MonoMod.Utils.DynamicData(this),
-            () => false,
-            () => direction,
-            dir => direction = dir
-        ));
+        Add(groupable = new GroupableMoveBlock());
+
+        DynamicData dynamicData = new(this);
+        Add(new MoveBlockRedirectable(dynamicData, () => false, () => direction, dir => direction = dir)
+        {
+            Get_Speed = () => speed,
+            Set_Speed = (speed) => this.speed = speed,
+            Get_TargetSpeed = () => targetSpeed,
+            Set_TargetSpeed = (targetSpeed) => this.targetSpeed = targetSpeed,
+            Get_MoveSfx = () => moveSfx,
+            OnBreakAction = (coroutine) =>
+            {
+                groupable.State = GroupableMoveBlock.MovementState.Breaking;
+                MoveBlockRedirectable.GetControllerDelegate(dynamicData, 5)(coroutine);
+            },
+            OnResumeAction = (coroutine) =>
+            {
+                MoveBlockRedirectable.GetControllerDelegate(dynamicData, 4)(coroutine);
+            },
+        });
 
         int num = data.Width / 8;
         int num2 = data.Height / 8;
@@ -242,15 +256,16 @@ public class DreamMoveBlock : CustomDreamBlock
         while (true)
         {
             triggered = false;
-            state = MovementState.Idling;
-            while (!triggered && !HasPlayerRider())
+            groupable.State = GroupableMoveBlock.MovementState.Idling;
+            while (!triggered && !groupable.GroupTriggerSignal && !HasPlayerRider())
             {
                 yield return null;
             }
 
+            yield return new SwapImmediately(groupable.SyncGroupTriggers());
 
             Audio.Play(PlayerHasDreamDash ? CustomSFX.game_dreamMoveBlock_dream_move_block_activate : SFX.game_04_arrowblock_activate, Position);
-            state = MovementState.Moving;
+            groupable.State = GroupableMoveBlock.MovementState.Moving;
             StartShaking(0.2f);
             ActivateParticles();
             yield return 0.2f;
@@ -381,7 +396,7 @@ public class DreamMoveBlock : CustomDreamBlock
 
             Audio.Play(PlayerHasDreamDash ? CustomSFX.game_dreamMoveBlock_dream_move_block_break : SFX.game_04_arrowblock_break, Position);
             moveSfx.Stop();
-            state = MovementState.Breaking;
+            groupable.State = GroupableMoveBlock.MovementState.Breaking;
             speed = targetSpeed = 0f;
             angle = targetAngle = homeAngle;
             StartShaking(0.2f);
@@ -419,6 +434,8 @@ public class DreamMoveBlock : CustomDreamBlock
             float debrisMoveTime = Calc.Clamp(regenTime, 0, 0.6f);
 
             yield return waitTime;
+
+            yield return new SwapImmediately(groupable.WaitForRespawn());
 
             foreach (MoveBlockDebris d in debris)
             {
@@ -459,6 +476,8 @@ public class DreamMoveBlock : CustomDreamBlock
             {
                 d.RemoveSelf();
             }
+
+            groupable.WaitingForRespawn = false;
             Audio.Play(PlayerHasDreamDash ? CustomSFX.game_dreamMoveBlock_dream_move_block_reappear : SFX.game_04_arrowblock_reappear, Position);
             Visible = true;
             EnableStaticMovers();
@@ -473,7 +492,7 @@ public class DreamMoveBlock : CustomDreamBlock
 
     public override void BeginShatter()
     {
-        if (state != MovementState.Breaking)
+        if (groupable.State != GroupableMoveBlock.MovementState.Breaking)
             base.BeginShatter();
         oneUseBroken = true;
     }
@@ -676,44 +695,33 @@ public class DreamMoveBlock : CustomDreamBlock
         base.Render();
 
         Color color = Color.Lerp(ActiveLineColor, Color.Black, ColorLerp);
-        if (state != MovementState.Breaking)
+        if (groupable.State != GroupableMoveBlock.MovementState.Breaking && canSteer)
         {
-            int value = (int) Math.Floor(((0f - angle + ((float) Math.PI * 2f)) % ((float) Math.PI * 2f) / ((float) Math.PI * 2f) * 8f) + 0.5f);
-            MTexture arrow = arrows[Calc.Clamp(value, 0, 7)];
-            if(state == MovementState.Moving)
+            foreach (Image item in leftButton)
             {
-                arrow.DrawCentered(Center + baseData.Get<Vector2>("shake"), this.movingArrowColor);
+                item.Render();
             }
-            else
+            foreach (Image item2 in rightButton)
             {
-                arrow.DrawCentered(Center + baseData.Get<Vector2>("shake"), this.idleArrowColor);
+                item2.Render();
             }
-            
-            if(canSteer)
+            foreach (Image item3 in topButton)
             {
-                foreach (Image item in leftButton)
-                {
-                    item.Render();
-                }
-                foreach (Image item2 in rightButton)
-                {
-                    item2.Render();
-                }
-                foreach (Image item3 in topButton)
-                {
-                    item3.Render();
-                }
+                item3.Render();
+            }
 
-                foreach (Image item4 in body)
-                {
-                    item4.Render();
-                }
+            foreach (Image item4 in body)
+            {
+                item4.Render();
             }
         }
-        else
-        {
-            GFX.Game["objects/CommunalHelper/dreamMoveBlock/x"].DrawCentered(Center + baseData.Get<Vector2>("shake"), this.breakingCrossColor);
-        }
+
+        int value = (int) Math.Floor(((0f - angle + ((float) Math.PI * 2f)) % ((float) Math.PI * 2f) / ((float) Math.PI * 2f) * 8f) + 0.5f);
+        MTexture currentTex = groupable.State != GroupableMoveBlock.MovementState.Breaking
+            ? arrows[Calc.Clamp(value, 0, 7)]
+            : GFX.Game["objects/CommunalHelper/dreamMoveBlock/x"];
+        currentTex.DrawCentered(Center + baseData.Get<Vector2>("shake"), groupable.HighlightColor(currentArrowColor));
+
         float num = flash * 4f;
         Draw.Rect(X - num, Y - num, Width + (num * 2f), Height + (num * 2f), Color.White * flash);
         Position = position;
@@ -741,17 +749,17 @@ public class DreamMoveBlock : CustomDreamBlock
                 base.rightWobble = false;
             }
         }
-        if (state == MovementState.Idling)
+        if (groupable.State == GroupableMoveBlock.MovementState.Idling)
         {
             this.fillColor = Color.Lerp(fillColor, this.idleButtonsColor, 10f * Engine.DeltaTime);
             this.wobbleLineColor = this.idleWobbleLinesColor;
         }
-        else if (state == MovementState.Moving)
+        else if (groupable.State == GroupableMoveBlock.MovementState.Moving)
         {
             this.fillColor = Color.Lerp(fillColor, this.movingButtonsColor, 10f * Engine.DeltaTime);
             this.wobbleLineColor = this.movingWobbleLinesColor;
         }
-        else if(state == MovementState.Breaking && canSteer)
+        else if (groupable.State == GroupableMoveBlock.MovementState.Breaking && canSteer)
         {
             base.topWobble = true;
             base.bottomWobble = true;
@@ -779,6 +787,14 @@ public class DreamMoveBlock : CustomDreamBlock
                 item4.Color = this.fillColor;
             }
         }
+
+        Color value = groupable.State switch
+        {
+            GroupableMoveBlock.MovementState.Moving => movingArrowColor,
+            GroupableMoveBlock.MovementState.Breaking => breakingCrossColor,
+            _ => idleArrowColor,
+        };
+        currentArrowColor = Color.Lerp(currentArrowColor, value, 10f * Engine.DeltaTime);
     }
 
     private void AddImage(MTexture tex, Vector2 position, float rotation, Vector2 scale, List<Image> addTo)

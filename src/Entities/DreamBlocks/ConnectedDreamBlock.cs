@@ -138,7 +138,6 @@ public class ConnectedDreamBlock : CustomDreamBlock
             GroupBoundsMax = new Vector2(Right, Bottom);
             GroupEdges = new List<SpaceJamEdge>();
             GroupCorners = new List<SpaceJamCorner>();
-            GroupOffset = new Vector2(GroupBoundsMin.X, GroupBoundsMin.Y) - Position;
             AddToGroupAndFindChildren(this);
             SetupCustomParticles(0, 0); // Parameters are ignored
 
@@ -147,6 +146,7 @@ public class ConnectedDreamBlock : CustomDreamBlock
                 (int) GroupBoundsMin.Y,
                 (int) (GroupBoundsMax.X - GroupBoundsMin.X),
                 (int) (GroupBoundsMax.Y - GroupBoundsMin.Y));
+            GroupOffset = new Vector2(GroupBoundsMin.X, GroupBoundsMin.Y) - Position;
 
             float groupW = GroupBoundsMax.X - GroupBoundsMin.X;
             float groupH = GroupBoundsMax.Y - GroupBoundsMin.Y;

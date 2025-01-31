@@ -1,3 +1,13 @@
+--1.20.11 (12/01/2024)
+* Fixed Connected Dream Block culling issue. @earthwise01
+* Fixed custom move block debris lag. @aonkeeper4
+* Re-added Move Block Group support feature. @aonkeeper4
+* Added Gravity Helper compatibility to Seeker Dash. @aonkeeper4
+* Ported Pellet Emitters from SJ (paint). @swoolcock
+* Added a flag attribute to Underwater Music Controller. @aonkeeper4
+* Added an option to the Configure Elytra trigger to disable reverse vertical boosts. @aonkeeper4
+* Added a new Configure Dream Tunnel Dash trigger. @aonkeeper4
+
 --1.20.10 (29/12/2024)
 * Hotfix: rolled back new Cloudscape zoom support feature due to bug
 

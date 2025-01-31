@@ -33,6 +33,14 @@ public static class ModExports
             return DreamTunnelDash.DreamTunnelDashCount;
         }
 
+        public static bool IsDreamTunnelDashAttacking()
+        {
+            return DreamTunnelDash.DreamTunnelDashAttacking;
+        }
+
+        #region Components
+
+        // i'd love to be able to merge these 2 into 1 but i don't think we'll be able to for backwards compat reasons
         public static Component DreamTunnelInteraction(Action<Player> onPlayerEnter, Action<Player> onPlayerExit)
         {
             return new DreamTunnelInteraction(onPlayerEnter, onPlayerExit);
@@ -42,6 +50,23 @@ public static class ModExports
         {
             return new DreamTunnelInteraction(onPlayerEnter, onPlayerExit, evenIfIntermediate);
         }
+
+        public static Component DreamTunnelCollider(Collider collider, bool ignoreEntityCollidable)
+        {
+            return new DreamTunnelCollider(collider, ignoreEntityCollidable);
+        }
+
+        public static Component DreamTunnelCollider(Collider collider, bool ignoreEntityCollidable, Action<Player> onPlayerEnter, Action<Player> onPlayerExit, bool evenIfIntermediate)
+        {
+            return new DreamTunnelCollider(collider, ignoreEntityCollidable, onPlayerEnter, onPlayerExit, evenIfIntermediate);
+        }
+
+        public static bool DreamTunnelColliderCheck(Component collider, Player player)
+        {
+            return (collider as DreamTunnelCollider)?.Check(player) ?? false;
+        }
+
+        #endregion
 
         #endregion
 

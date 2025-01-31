@@ -30,10 +30,17 @@ public class DreamTunnelCollider : Component
 
     private readonly bool ignoreEntityCollidable;
 
-    public DreamTunnelCollider(Collider collider, bool ignoreEntityCollidable = false) : base(true, true)
+    public DreamTunnelCollider(
+        Collider collider, bool ignoreEntityCollidable = false,
+        Action<Player> onPlayerEnter = null, Action<Player> onPlayerExit = null, bool evenIfIntermediate = false
+    )
+        : base(true, true)
     {
         Collider = collider;
-        Dummy = new(Entity, this);
+        Dummy = new(Entity, this)
+        {
+            new DreamTunnelInteraction(onPlayerEnter, onPlayerExit, evenIfIntermediate)
+        };
 
         this.ignoreEntityCollidable = ignoreEntityCollidable;
     }

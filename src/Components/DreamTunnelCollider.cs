@@ -59,7 +59,7 @@ public class DreamTunnelCollider : Component
     {
         // no need for a Player_canEnterDreamTunnelCollider check like DreamDashCollider, as DreamTunnelDashAttacking is enough
         // the check is necessary in DreamDashCollider because some things give dash attack without the player needing to (be able to) dash
-        if (Active && Collider is not null && Entity != null)
+        if (Active && Collider is not null && Entity is not null)
         {
             Collider collider = Entity.Collider;
             bool collidable = Entity.Collidable;

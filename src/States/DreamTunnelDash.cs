@@ -197,11 +197,18 @@ public static class DreamTunnelDash
                 }
                 else if (player.DashDir.Y >= 0f || player.DashDir.X != 0f)
                 {
-                    if (player.DashDir.X > 0f && player.CollideCheck<Solid>(player.Position - (Vector2.UnitX * 5f)))
+                    Vector2 at = player.Position - (Vector2.UnitX * 5f);
+                    if (player.DashDir.X > 0f && (
+                            player.CollideCheck<Solid>(player.Position - (Vector2.UnitX * 5f)) ||
+                            player.Scene.Tracker.GetComponents<DreamTunnelCollider>().Cast<DreamTunnelCollider>().Any(c => c.Check(player, -Vector2.UnitX * 5f))
+                        ))
                     {
                         player.MoveHExact(-5, null, null);
                     }
-                    else if (player.DashDir.X < 0f && player.CollideCheck<Solid>(player.Position + (Vector2.UnitX * 5f)))
+                    else if (player.DashDir.X < 0f && (
+                            player.CollideCheck<Solid>(player.Position + (Vector2.UnitX * 5f)) ||
+                            player.Scene.Tracker.GetComponents<DreamTunnelCollider>().Cast<DreamTunnelCollider>().Any(c => c.Check(player, Vector2.UnitX * 5f))
+                        ))
                     {
                         player.MoveHExact(5, null, null);
                     }

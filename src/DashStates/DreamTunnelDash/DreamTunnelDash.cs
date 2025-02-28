@@ -1,4 +1,4 @@
-﻿using Celeste.Mod.CommunalHelper.Components;
+using Celeste.Mod.CommunalHelper.Components;
 using Celeste.Mod.CommunalHelper.States;
 using Mono.Cecil.Cil;
 using MonoMod.Cil;
@@ -72,6 +72,7 @@ public static class DreamTunnelDash
         public SpeedConfiguration SpeedConfiguration;
         public float CustomSpeed;
         public bool AllowDashCancels;
+        public bool RedirectConsumesNormalDash;
     }
 
     public static readonly DreamTunnelDashConfiguration DefaultDreamTunnelDashConfiguration = new()
@@ -83,6 +84,7 @@ public static class DreamTunnelDash
         SpeedConfiguration = SpeedConfiguration.Default,
         CustomSpeed = 0,
         AllowDashCancels = false,
+        RedirectConsumesNormalDash = false,
     };
 
 
@@ -173,7 +175,7 @@ public static class DreamTunnelDash
         DreamTunnelDashAttacking = false;
     }
 
-    private static void StartDreamTunnelDashAttacking(Player player)
+    private static void StartDreamTunnelDashAttacking(Player player, Vector2? checkDirFromDashCoroutine = null)
     {
         if (canStartDreamTunnelDashAttack)
         {
@@ -181,15 +183,15 @@ public static class DreamTunnelDash
             dreamTunnelDashTimer = player.GetData().Get<float>("dashAttackTimer");
 
             // Ensures the player enters the dream tunnel dash state if dashing into a fast moving block
-            // Because of how it works, it removes dashdir leniency :(
+            // Because of how it works, it removes dashdir leniency if the solid is entered and AllowDashCancels is off :(
             DynamicData playerData = player.GetData();
-            Vector2 lastAim = Input.GetAimVector(player.Facing);
-            Vector2 dir = lastAim.Sign();
+            Vector2 checkDir = checkDirFromDashCoroutine ?? Input.GetAimVector(player.Facing);
+            Vector2 dir = checkDir.Sign();
             bool testSolids = !player.CollideCheck<Solid, DreamBlock>() && player.CollideCheck<Solid, DreamBlock>(player.Position + dir);
             bool testColliders = player.Scene.Tracker.GetComponents<DreamTunnelCollider>().Cast<DreamTunnelCollider>().Any(c => !c.Check(player) && c.Check(player, dir));
             if (testSolids || testColliders)
             {
-                player.Speed = player.DashDir = lastAim;
+                if (checkDirFromDashCoroutine is null) player.Speed = player.DashDir = checkDir;
                 player.MoveHExact((int) dir.X, playerData.Get<Collision>("onCollideH"));
                 player.MoveVExact((int) dir.Y, playerData.Get<Collision>("onCollideV"));
             }
@@ -246,7 +248,7 @@ public static class DreamTunnelDash
         /*
          * start the player dream tunnel dash later if needed to allow cancelling it
          * this replicates vanilla behavior of being able to instant hyper for example on dream blocks
-         * inserts a call to StartDreamTunnelDashAttacking after the call to CallDashEvents if the current dream dash config allows dash cancels
+         * inserts a call to StartDreamTunnelDashAttacking (without overriding Speed and DashDir) after the call to CallDashEvents if the current dream dash config allows dash cancels
          * is this the best place to put this logic?
          */
         ILLabel afterStartDashAttack = cursor.DefineLabel();
@@ -254,7 +256,7 @@ public static class DreamTunnelDash
         cursor.EmitDelegate(() => CommunalHelperModule.Session.CurrentDreamTunnelDashConfiguration.AllowDashCancels);
         cursor.Emit(OpCodes.Brfalse, afterStartDashAttack);
         cursor.Emit(OpCodes.Ldloc_1);
-        cursor.EmitDelegate(StartDreamTunnelDashAttacking);
+        cursor.EmitDelegate<Action<Player>>(player => StartDreamTunnelDashAttacking(player, player.DashDir));
         cursor.MarkLabel(afterStartDashAttack);
 
         /*

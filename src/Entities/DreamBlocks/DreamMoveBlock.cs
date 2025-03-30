@@ -89,9 +89,14 @@ public class DreamMoveBlock : CustomDreamBlock
 
     private readonly Coroutine controller;
     private readonly bool noCollide;
+    private readonly bool noCollideSteer;
     private readonly bool canSteer;
 
+    private bool IsNoCollide => noCollide || noCollideSteer;
+
     private bool oneUseBroken;
+
+    private readonly bool noDebris;
 
     internal static void InitializeParticles()
     {
@@ -123,6 +128,7 @@ public class DreamMoveBlock : CustomDreamBlock
         // Backwards Compatibility
         moveSpeed = data.Bool("fast") ? FastMoveSpeed : data.Float("moveSpeed", MoveSpeed);
         noCollide = data.Bool("noCollide");
+        noCollideSteer = data.Bool("noCollideSteer", false);
 
         canSteer = data.Bool("canSteer");
 
@@ -147,6 +153,8 @@ public class DreamMoveBlock : CustomDreamBlock
         crashTime = data.Float("crashTime", 0.15f);
         regenTime = data.Float("regenTime", 3f);
         shakeOnCollision = data.Bool("shakeOnCollision", true);
+
+        noDebris = data.Bool("noDebris");
 
         if (data.Attr("idleButtonsColor", "FFFFFF") != "FFFFFF")
         {
@@ -322,7 +330,12 @@ public class DreamMoveBlock : CustomDreamBlock
                 {
                     hit = MoveCheck(move.XComp());
                     noSquish = Scene.Tracker.GetEntity<Player>();
-                    MoveVCollideSolids(move.Y, thruDashBlocks: false);
+
+                    if (canSteer || noCollideSteer)
+                        MoveCheck(move.YComp());
+                    else
+                        MoveVCollideSolids(move.Y, thruDashBlocks: false);
+
                     noSquish = null;
                     if (Scene.OnInterval(0.03f))
                     {
@@ -340,7 +353,12 @@ public class DreamMoveBlock : CustomDreamBlock
                 {
                     hit = MoveCheck(move.YComp());
                     noSquish = Scene.Tracker.GetEntity<Player>();
-                    MoveHCollideSolids(move.X, thruDashBlocks: false);
+
+                    if (canSteer || noCollideSteer)
+                        MoveCheck(move.XComp());
+                    else
+                        MoveHCollideSolids(move.X, thruDashBlocks: false);
+
                     noSquish = null;
                     if (Scene.OnInterval(0.03f))
                     {
@@ -407,20 +425,22 @@ public class DreamMoveBlock : CustomDreamBlock
             BreakParticles();
             ((MoveBlockRedirectable) Get<Redirectable>())?.ResetBlock();
             List<MoveBlockDebris> debris = new();
-            for (int x = 0; x < Width; x += 8)
-            {
-                for (int y = 0; y < Height; y += 8)
+            if (!noDebris) {
+                for (int x = 0; x < Width; x += 8)
                 {
-                    Vector2 offset = new(x + 4f, y + 4f);
-                    MTexture texture = Calc.Random.Choose(GFX.Game.GetAtlasSubtextures("objects/CommunalHelper/dreamMoveBlock/debris"));
-                    MTexture altTexture = GFX.Game[texture.AtlasPath.Replace("debris", "disabledDebris")];
-                    MoveBlockDebris d = Engine.Pooler.Create<MoveBlockDebris>()
-                        .Init(Position + offset, Center, startPosition + offset, spr =>
-                        {
-                            spr.Texture = PlayerHasDreamDash ? texture : altTexture;
-                        });
-                    debris.Add(d);
-                    Scene.Add(d);
+                    for (int y = 0; y < Height; y += 8)
+                    {
+                        Vector2 offset = new(x + 4f, y + 4f);
+                        MTexture texture = Calc.Random.Choose(GFX.Game.GetAtlasSubtextures("objects/CommunalHelper/dreamMoveBlock/debris"));
+                        MTexture altTexture = GFX.Game[texture.AtlasPath.Replace("debris", "disabledDebris")];
+                        MoveBlockDebris d = Engine.Pooler.Create<MoveBlockDebris>()
+                            .Init(Position + offset, Center, startPosition + offset, spr =>
+                            {
+                                spr.Texture = PlayerHasDreamDash ? texture : altTexture;
+                            });
+                        debris.Add(d);
+                        Scene.Add(d);
+                    }
                 }
             }
             MoveStaticMovers(startPosition - Position);
@@ -447,14 +467,14 @@ public class DreamMoveBlock : CustomDreamBlock
                 yield break;
             }
 
-            while (CollideCheck<Actor>() || (noCollide ? CollideCheck<DreamBlock>() : CollideCheck<Solid>()))
+            while (CollideCheck<Actor>() || (IsNoCollide ? CollideCheck<DreamBlock>() : CollideCheck<Solid>()))
             {
                 yield return null;
             }
 
 
             Collidable = true;
-            EventInstance sound = Audio.Play(SFX.game_04_arrowblock_reform_begin, debris[0].Position);
+            EventInstance sound = Audio.Play(SFX.game_04_arrowblock_reform_begin, debris.FirstOrDefault()?.Position ?? Center);
             Coroutine soundFollower = new(SoundFollowsDebrisCenter(sound, debris));
             Add(soundFollower);
             foreach (MoveBlockDebris d in debris)
@@ -533,7 +553,7 @@ public class DreamMoveBlock : CustomDreamBlock
 
     private IEnumerator SoundFollowsDebrisCenter(EventInstance instance, List<MoveBlockDebris> debris)
     {
-        while (true)
+        while (true && debris.Count > 0)
         {
             instance.getPlaybackState(out PLAYBACK_STATE state);
             if (state == PLAYBACK_STATE.STOPPED)
@@ -626,7 +646,7 @@ public class DreamMoveBlock : CustomDreamBlock
     {
         if (speed.X != 0f)
         {
-            if (!noCollide || CollideCheck<DreamBlock>(Position + speed.XComp()))
+            if (!IsNoCollide || CollideCheck<DreamBlock>(Position + speed.XComp()))
             {
                 if (MoveHCollideSolids(speed.X, thruDashBlocks: false))
                 {
@@ -654,7 +674,7 @@ public class DreamMoveBlock : CustomDreamBlock
         }
         if (speed.Y != 0f)
         {
-            if (!noCollide || CollideCheck<DreamBlock>(Position + speed.YComp()))
+            if (!IsNoCollide || CollideCheck<DreamBlock>(Position + speed.YComp()))
             {
                 if (MoveVCollideSolids(speed.Y, thruDashBlocks: false))
                 {
@@ -921,7 +941,7 @@ public class DreamMoveBlock : CustomDreamBlock
 
     private void ScrapeParticles(Vector2 dir)
     {
-        if (noCollide)
+        if (IsNoCollide)
             return;
 
         Collidable = false;

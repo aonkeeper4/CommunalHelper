@@ -13,6 +13,9 @@ entities.CommunalHelper/DreamJellyfish.placements.name.floating=Dream Jellyfish 
 entities.CommunalHelper/DreamJellyfish.attributes.description.bubble=Whether the entity should hover in the air before being grabbed.
 entities.CommunalHelper/DreamJellyfish.attributes.description.tutorial=Whether the entity should show the usage tutorial.
 
+# Dream Theo Crystal
+entities.CommunalHelper/DreamTheoCrystal.placements.name.dream_theo_crystal=Dream Theo Crystal
+
 # Dream Booster
 entities.CommunalHelper/DreamBoosterAny.placements.name.dream_booster=Dream Booster (Any Direction)
 
@@ -189,6 +192,7 @@ entities.CommunalHelper/CassetteMoveBlock.attributes.name.regenTime=Respawn Time
 entities.CommunalHelper/CassetteMoveBlock.attributes.description.crashTime=The time it takes for this Cassette Move Block to break when hitting a solid in seconds.
 entities.CommunalHelper/CassetteMoveBlock.attributes.description.regenTime=The time it takes for this Cassette Move Block to respawn after breaking in seconds.
 entities.CommunalHelper/CassetteMoveBlock.attributes.description.shakeOnCollision=Whether this Cassette Move Block should start shaking if it collides with a solid for longer than the default break time.
+entities.CommunalHelper/CassetteMoveBlock.attributes.description.noDebris=Whether this Cassette Move Block should not spawn debris when it breaks.
 
 # Cassette Swap Block
 entities.CommunalHelper/CassetteSwapBlock.placements.name.cassette_block_0=Cassette Swap Block (0 - Blue)
@@ -269,7 +273,7 @@ entities.CommunalHelper/SolidExtension.attributes.description.collidable=Whether
 
 # Dream Zip Mover
 entities.CommunalHelper/DreamZipMover.placements.name.dream_zip_mover=Dream Zip Mover
-entities.CommunalHelper/DreamZipMover.attributes.description.below=Determines whether the Dream Move Block should render below foreground tiles.
+entities.CommunalHelper/DreamZipMover.attributes.description.below=Determines whether the Dream Zip Mover should render below foreground tiles.
 entities.CommunalHelper/DreamZipMover.attributes.description.noReturn=Whether the Dream Zip Mover should return to its starting point or not.
 entities.CommunalHelper/DreamZipMover.attributes.description.dreamAesthetic=Optional look for this entity, mostly unused, but left there.
 entities.CommunalHelper/DreamZipMover.attributes.description.featherMode=Whether the Dream Zip Mover has the Dream Block Feather controls enabled.
@@ -310,6 +314,7 @@ entities.CommunalHelper/DreamMoveBlock.attributes.description.direction=The dire
 entities.CommunalHelper/DreamMoveBlock.attributes.description.refillCount=Number of dashes the Dream Move Block should refill (-1 for default).
 entities.CommunalHelper/DreamMoveBlock.attributes.description.moveSpeed=The speed at which the Dream Move Block moves (accepts any number).
 entities.CommunalHelper/DreamMoveBlock.attributes.description.noCollide=Whether the Dream Move Block should go through solids.
+entities.CommunalHelper/DreamMoveBlock.attributes.description.noCollideSteer=Force-allow this block to go through solids when it is steerable.
 entities.CommunalHelper/DreamMoveBlock.attributes.description.featherMode=Whether the Dream Move Block has the Dream Block Feather controls enabled.
 entities.CommunalHelper/DreamMoveBlock.attributes.description.oneUse=Whether the Dream Move Block should shatter upon exit.
 entities.CommunalHelper/DreamMoveBlock.attributes.description.quickDestroy=Makes this Dream Move Block shatter a little faster.
@@ -318,6 +323,7 @@ entities.CommunalHelper/DreamMoveBlock.attributes.name.regenTime=Respawn Time
 entities.CommunalHelper/DreamMoveBlock.attributes.description.crashTime=The time it takes for this Dream Move Block to break when hitting a solid in seconds.
 entities.CommunalHelper/DreamMoveBlock.attributes.description.regenTime=The time it takes for this Dream Move Block to respawn after breaking in seconds.
 entities.CommunalHelper/DreamMoveBlock.attributes.description.shakeOnCollision=Whether this Dream Move Block should start shaking if it collides with a solid for longer than the default break time.
+entities.CommunalHelper/DreamMoveBlock.attributes.description.noDebris=Whether this Dream Move Block should not spawn debris when it breaks.
 entities.CommunalHelper/DreamMoveBlock.Attributes.description.idleButtonsColor=Body and buttons's color when the block is idle.
 entities.CommunalHelper/DreamMoveBlock.Attributes.description.idleArrowColor=Arrow's color when the block is idle.
 entities.CommunalHelper/DreamMoveBlock.Attributes.description.idleWobbleLinesColor=Wobble lines's color when the block is idle.
@@ -430,6 +436,7 @@ entities.CommunalHelper/ConnectedMoveBlock.attributes.name.regenTime=Respawn Tim
 entities.CommunalHelper/ConnectedMoveBlock.attributes.description.crashTime=The time it takes for this Connected Move Block to break when hitting a solid in seconds.
 entities.CommunalHelper/ConnectedMoveBlock.attributes.description.regenTime=The time it takes for this Connected Move Block to respawn after breaking in seconds.
 entities.CommunalHelper/ConnectedMoveBlock.attributes.description.shakeOnCollision=Whether this Connected Move Block should start shaking if it collides with a solid for longer than the default break time.
+entities.CommunalHelper/ConnectedMoveBlock.attributes.description.noDebris=Whether this Connected Move Block should not spawn debris when it breaks.
 
 # Connected Temple Cracked Block
 entities.CommunalHelper/ConnectedTempleCrackedBlock.placements.name.normal=Connected Temple Cracked Block
@@ -464,6 +471,7 @@ entities.CommunalHelper/EquationMoveBlock.attributes.name.regenTime=Respawn Time
 entities.CommunalHelper/EquationMoveBlock.attributes.description.crashTime=The time it takes for this Equation Move Block to break when hitting a solid in seconds.
 entities.CommunalHelper/EquationMoveBlock.attributes.description.regenTime=The time it takes for this Equation Move Block to respawn after breaking in seconds.
 entities.CommunalHelper/EquationMoveBlock.attributes.description.shakeOnCollision=Whether this Equation Move Block should start shaking if it collides with a solid for longer than the default break time.
+entities.CommunalHelper/EquationMoveBlock.attributes.description.noDebris=Whether this Equation Move Block should not spawn debris when it breaks.
 
 # Bouncy Panel
 entities.CommunalHelper/BouncyPanel.placements.name.up=Bouncy Panel (Up)
@@ -608,6 +616,7 @@ entities.CommunalHelper/MoveSwapBlock.attributes.name.regenTime=Respawn Time
 entities.CommunalHelper/MoveSwapBlock.attributes.description.crashTime=The time it takes for this Move Swap Block to break when hitting a solid in seconds.
 entities.CommunalHelper/MoveSwapBlock.attributes.description.regenTime=The time it takes for this Move Swap Block to respawn after breaking in seconds.
 entities.CommunalHelper/MoveSwapBlock.attributes.description.shakeOnCollision=Whether this Move Swap Block should start shaking if it collides with a solid for longer than the default break time.
+entities.CommunalHelper/MoveSwapBlock.attributes.description.noDebris=Whether this Move Swap Block should not spawn debris when it breaks.
 
 # Player Bubble Region
 entities.CommunalHelper/PlayerBubbleRegion.placements.name.player_bubble_region=Player Bubble Region
@@ -1096,6 +1105,7 @@ style.effects.CommunalHelper/Cloudscape.description.outerRotation=The rotational
 style.effects.CommunalHelper/Cloudscape.description.rotationExponent=A number between 0 and 2 that describes the interpolation of the rotational speed between the inner and outer rings. 1 is linear, 0 makes the value approach the outer target value faster, 2 makes the value approach the outer target value sooner.\nThis is hard to describe.
 style.effects.CommunalHelper/Cloudscape.description.hasBackgroundColor=Whether the background should be filled with the `bgColor` color specified. Disabling this makes it so that styleground layers below this Cloudscape instance can be seen.
 style.effects.CommunalHelper/Cloudscape.description.additive=Whether this Cloudscape instance renders onto the screen with the additive blending mode.
+style.effects.CommunalHelper/Cloudscape.description.zoomBehavior=How this Cloudscape behaves when the camera gets zoomed in/out.\nStaySame - The Cloudscape remains the exact same, regardless of zoom level.\nAdjust - The Cloudscape zooms in/out together with the camera.
 
 # BetaCube
 style.effects.CommunalHelper/BetaCube.name=Beta Cube

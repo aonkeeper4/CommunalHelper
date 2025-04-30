@@ -126,7 +126,7 @@ public static class DreamTunnelDash
 
         IL.Celeste.FakeWall.Update += State_DreamDashNotEqual;
         IL.Celeste.Spring.OnCollide += State_DreamDashEqual;
-        IL.Celeste.Solid.Update += State_DreamDashNotEqual_And;
+        IL.Celeste.Solid.Update += State_DreamDashNotEqual;
     }
 
     public static void Unload()
@@ -159,7 +159,7 @@ public static class DreamTunnelDash
 
         IL.Celeste.FakeWall.Update -= State_DreamDashNotEqual;
         IL.Celeste.Spring.OnCollide -= State_DreamDashEqual;
-        IL.Celeste.Solid.Update -= State_DreamDashNotEqual_And;
+        IL.Celeste.Solid.Update -= State_DreamDashNotEqual;
     }
 
     public static void InitializeParticles()
@@ -365,7 +365,7 @@ public static class DreamTunnelDash
         if (il.Instrs[0].OpCode == OpCodes.Nop)
             State_DreamDashEqual(il);
         else
-            State_DreamDashNotEqual_And(il);
+            State_DreamDashNotEqual(il);
     }
 
     private static void Player_BeforeUpTransition(ILContext il)
@@ -373,14 +373,14 @@ public static class DreamTunnelDash
         ILCursor cursor = new(il); 
         
         CheckState(cursor, Player.StRedDash, false);
-        CheckState(cursor, Player.StRedDash, false, true);
+        CheckState(cursor, Player.StRedDash, false);
     }
 
     private static void Player_BeforeDownTransition(ILContext il)
     {
         ILCursor cursor = new(il);
         
-        CheckState(cursor, Player.StRedDash, false, true);
+        CheckState(cursor, Player.StRedDash, false);
     }
 
     private static void Player_TransitionTo(ILContext il)
@@ -438,14 +438,7 @@ public static class DreamTunnelDash
     /// Use if decompilation says <c>State!=9</c> and NOT followed by <c>&amp;&amp;</c>.
     /// </summary>
     private static readonly ILContext.Manipulator State_DreamDashNotEqual = il => CheckState(new ILCursor(il), Player.StDreamDash, false);
-    /// <summary>
-    /// Use if decompilation says <c>State==9</c> and IS followed by <c>&amp;&amp;</c>.
-    /// </summary>
-    private static readonly ILContext.Manipulator State_DreamDashEqual_And = il => CheckState(new ILCursor(il), Player.StDreamDash, true, true);
-    /// <summary>
-    /// Use if decompilation says <c>State!=9</c> and IS followed by <c>&amp;&amp;</c>.
-    /// </summary>
-    private static readonly ILContext.Manipulator State_DreamDashNotEqual_And = il => CheckState(new ILCursor(il), Player.StDreamDash, false, true);
+
     /// <summary>
     /// Patch any method that checks the player's state.
     /// </summary>
@@ -453,8 +446,7 @@ public static class DreamTunnelDash
     /// <param name="cursor">The ILCursor to use</param>
     /// <param name="state">The state to check for</param>
     /// <param name="equal">Whether the decompilation says <c>State == &lt;state&gt;</c></param>
-    /// <param name="and">Whether the check is followed by <c>&amp;&amp;</c></param>
-    private static void CheckState(ILCursor cursor, int state, bool equal, bool and = false)
+    private static void CheckState(ILCursor cursor, int state, bool equal)
     {
         if (cursor.TryGotoNext(instr => instr.MatchLdcI4(state) &&
             instr.Previous != null && instr.Previous.MatchCallvirt<StateMachine>("get_State")))
@@ -462,30 +454,30 @@ public static class DreamTunnelDash
             Instruction idx = cursor.Next;
             // Duplicate the Player State
             cursor.Emit(OpCodes.Dup);
-            // Check whether the state matches St.DreamTunnelDash AND we want them to match
-            cursor.EmitDelegate<Func<int, bool>>(st => st == St.DreamTunnelDash == equal ^ and);
+            // Check whether the state matches St.DreamTunnelDash
+            cursor.EmitDelegate<Func<int, bool>>(st => st == St.DreamTunnelDash);
             // If not, skip the rest of the emitted instructions
-            cursor.Emit(OpCodes.Brfalse_S, cursor.Next);
+            cursor.Emit(OpCodes.Brfalse, cursor.Next);
 
             // Else
             // Duplicated Player State value will be unused, so it must be trashed
             cursor.Emit(OpCodes.Pop);
 
             // Retrieve the next break instruction that checks equality
-            Instruction breakInstr = cursor.Clone().GotoNext(instr => instr.Match(OpCodes.Beq_S) || instr.Match(OpCodes.Bne_Un_S) || instr.Match(OpCodes.Ceq)).Next;
+            Instruction breakInstr = cursor.Clone().GotoNext(instr => instr.MatchBeq(out ILLabel _) || instr.MatchBneUn(out ILLabel _) || instr.MatchCeq()).Next;
 
             // For SteamFNA, if there is a check for equality just break to after it after pushing the appropriate value to the stack
-            if (breakInstr.OpCode == OpCodes.Ceq)
+            if (breakInstr.MatchCeq())
             {
                 cursor.Emit(equal ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0);
-                cursor.Emit(OpCodes.Br_S, breakInstr.Next);
+                cursor.Emit(OpCodes.Br, breakInstr.Next);
             }
             // If our intended behaviour matches what the break instruction is checking for, break to its target
-            else if (breakInstr.OpCode == OpCodes.Beq_S == equal ^ and)
-                cursor.Emit(OpCodes.Br_S, breakInstr.Operand);
+            else if (breakInstr.MatchBeq(out ILLabel to))
+                cursor.Emit(OpCodes.Br, to);
             // Otherwise, break to after the break instruction (skip it)
             else
-                cursor.Emit(OpCodes.Br_S, breakInstr.Next);
+                cursor.Emit(OpCodes.Br, breakInstr.Next);
 
             cursor.Goto(idx, MoveType.After);
         }
@@ -495,10 +487,10 @@ public static class DreamTunnelDash
     {
         ILCursor cursor = new(il);
         CheckState(cursor, Player.StDreamDash, true);
-        CheckState(cursor, Player.StDreamDash, false, true);
-        CheckState(cursor, Player.StDreamDash, false, true);
+        CheckState(cursor, Player.StDreamDash, false);
+        CheckState(cursor, Player.StDreamDash, false);
         // Not used because we DO want to enforce Level bounds.
-        //Check_State_DreamDash(cursor, false, true);
+        //Check_State_DreamDash(cursor, false);
     }
     
     private static void Level_EnforceBounds(ILContext il)

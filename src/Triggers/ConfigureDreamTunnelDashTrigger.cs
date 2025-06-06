@@ -3,7 +3,6 @@ using static Celeste.Mod.CommunalHelper.DashStates.DreamTunnelDash;
 namespace Celeste.Mod.CommunalHelper.Triggers;
 
 [CustomEntity("CommunalHelper/ConfigureDreamTunnelDashTrigger")]
-[TrackedAs(typeof(AbstractConfigureStateTrigger<DreamTunnelDashConfiguration, DreamTunnelDashConfigurationChanges>))]
 public class ConfigureDreamTunnelDashTrigger : AbstractConfigureStateTrigger<DreamTunnelDashConfiguration, DreamTunnelDashConfigurationChanges>
 { 
     public ConfigureDreamTunnelDashTrigger(EntityData data, Vector2 offset)

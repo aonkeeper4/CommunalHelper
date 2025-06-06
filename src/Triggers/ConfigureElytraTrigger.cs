@@ -4,7 +4,6 @@ using static Celeste.Mod.CommunalHelper.States.Elytra;
 namespace Celeste.Mod.CommunalHelper.Triggers;
 
 [CustomEntity("CommunalHelper/ConfigureElytraTrigger")]
-[TrackedAs(typeof(AbstractConfigureStateTrigger<ElytraOptions, ElytraOptionsChanges>))]
 internal class ConfigureElytraTrigger : AbstractConfigureStateTrigger<ElytraOptions, ElytraOptionsChanges>
 {
     public ConfigureElytraTrigger(EntityData data, Vector2 offset)

@@ -1,5 +1,3 @@
-using System.Collections;
-
 namespace Celeste.Mod.CommunalHelper.Entities;
 
 public class AeroScreen_Cassette : AeroScreen
@@ -9,20 +7,20 @@ public class AeroScreen_Cassette : AeroScreen
     private float screenW, screenH;
     private float targetScreenW, targetScreenH;
     private readonly float maxTargetScreenW, maxTargetScreenH;
-    private const float blinkThreshold = 0.3f;
-    private const float blinkSpeedFactor = 15f;
+    private const float BlinkThreshold = 0.3f;
+    private const float BlinkSpeedFactor = 15f;
 
     private bool backlit;
-    private const float backlightBrightness = 0.25f;
+    private const float BacklightBrightness = 0.25f;
 
-    private CassetteListener listener;
+    private readonly CassetteListener listener;
 
-    private Color[] colorOptions = new Color[] {
+    private static readonly Color[] ColorOptions = [
         Calc.HexToColor("49aaf0"),
         Calc.HexToColor("f049be"),
         Calc.HexToColor("fcdc3a"),
         Calc.HexToColor("38e04e")
-    };
+    ];
     private readonly Color screenColor;
 
     public AeroScreen_Cassette(int width, int height, CassetteListener listener, Color? screenColor = null)
@@ -34,7 +32,7 @@ public class AeroScreen_Cassette : AeroScreen
         this.listener.OnWillActivate += OnWillActivate;
         this.listener.OnWillDeactivate += OnWillDeactivate;
 
-        this.screenColor = screenColor ?? colorOptions[listener.Index];
+        this.screenColor = screenColor ?? ColorOptions[listener.Index];
         maxTargetScreenW = targetScreenW = width - 8;
         maxTargetScreenH = targetScreenH = height - 8;
         screenW = screenH = 0;
@@ -45,10 +43,10 @@ public class AeroScreen_Cassette : AeroScreen
 
     public override void Update()
     {
-        targetScreenW = listener.Activated ? maxTargetScreenW : (screenH / maxTargetScreenH > blinkThreshold ? maxTargetScreenW : 0);
-        targetScreenH = listener.Activated ? (screenW / maxTargetScreenW > (1 - blinkThreshold) ? maxTargetScreenH : 1) : 1;
-        screenW = Calc.Approach(screenW, targetScreenW, blinkSpeedFactor * maxTargetScreenW * Engine.DeltaTime);
-        screenH = Calc.Approach(screenH, targetScreenH, blinkSpeedFactor * maxTargetScreenH * Engine.DeltaTime);
+        targetScreenW = listener.Activated ? maxTargetScreenW : (screenH / maxTargetScreenH > BlinkThreshold ? maxTargetScreenW : 0);
+        targetScreenH = listener.Activated ? (screenW / maxTargetScreenW > 1 - BlinkThreshold ? maxTargetScreenH : 1) : 1;
+        screenW = Calc.Approach(screenW, targetScreenW, BlinkSpeedFactor * maxTargetScreenW * Engine.DeltaTime);
+        screenH = Calc.Approach(screenH, targetScreenH, BlinkSpeedFactor * maxTargetScreenH * Engine.DeltaTime);
     }
 
     private void DrawRectCentered(float w, float h, Color col)
@@ -59,9 +57,8 @@ public class AeroScreen_Cassette : AeroScreen
     public override void Render()
     {
         if (backlit)
-        {
-            DrawRectCentered(maxTargetScreenW, maxTargetScreenH, Color.Lerp(Color.Transparent, screenColor, backlightBrightness));
-        }
+            DrawRectCentered(maxTargetScreenW, maxTargetScreenH, Color.Lerp(Color.Transparent, screenColor, BacklightBrightness));
+        
         DrawRectCentered(screenW, screenH, screenColor);
     }
 

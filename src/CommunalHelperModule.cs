@@ -6,13 +6,13 @@ using Celeste.Mod.CommunalHelper.Backdrops;
 using Celeste.Mod.CommunalHelper.Components;
 using Celeste.Mod.CommunalHelper.DashStates;
 using Celeste.Mod.CommunalHelper.Entities;
-using Celeste.Mod.CommunalHelper.Entities.Misc;
 using Celeste.Mod.CommunalHelper.Entities.StrawberryJam;
 using Celeste.Mod.CommunalHelper.Imports;
 using Celeste.Mod.CommunalHelper.States;
 using Celeste.Mod.CommunalHelper.Triggers;
 using Celeste.Mod.CommunalHelper.Triggers.StrawberryJam;
 using MonoMod.ModInterop;
+using DreamTunnelDash = Celeste.Mod.CommunalHelper.DashStates.DreamTunnelDash;
 
 namespace Celeste.Mod.CommunalHelper;
 
@@ -78,8 +78,10 @@ public class CommunalHelperModule : EverestModule
 
         CustomBooster.Load();
 
+        DreamHoldable.Load();
+        DreamSprite.Load();
         DreamJellyfish.Load();
-        DreamJellyfishRenderer.Load();
+        DreamTheoCrystal.Load();
 
         ChainedKevin.Load();
 
@@ -99,10 +101,11 @@ public class CommunalHelperModule : EverestModule
         WormholeBooster.Load();
         OshiroAttackTimeTrigger.Load();
         PlayerVisualModifier.Load();
+        
+        ConfigureDreamTunnelDashTrigger.Load();
+        ConfigureElytraTrigger.Load();
 
         AeroBlockCharged.Load();
-
-        Shape3DRenderer.Load();
 
         St.Load();
 
@@ -114,6 +117,8 @@ public class CommunalHelperModule : EverestModule
         BadelineBoostKeepHoldables.Hook();
         PoisonGas.Load();
         AffectSpriteTrigger.Load();
+
+        MelvinTargetable.Load();
 
         #region Imports
 
@@ -168,8 +173,10 @@ public class CommunalHelperModule : EverestModule
 
         CustomBooster.Unload();
 
+        DreamHoldable.Unload();
+        DreamSprite.Unload();
         DreamJellyfish.Unload();
-        DreamJellyfishRenderer.Unload();
+        DreamTheoCrystal.Unload();
 
         ChainedKevin.Unload();
 
@@ -189,10 +196,11 @@ public class CommunalHelperModule : EverestModule
         WormholeBooster.Unload();
         OshiroAttackTimeTrigger.Unload();
         PlayerVisualModifier.Unload();
+        
+        ConfigureDreamTunnelDashTrigger.Unload();
+        ConfigureElytraTrigger.Unload();
 
         AeroBlockCharged.Unload();
-
-        Shape3DRenderer.Unload();
 
         St.Unload();
 
@@ -208,6 +216,8 @@ public class CommunalHelperModule : EverestModule
         PoisonGas.Unload();
         AffectSpriteTrigger.Unload();
 
+        MelvinTargetable.Unload();
+
         LaserEmitter.Unload();
     }
 
@@ -217,12 +227,13 @@ public class CommunalHelperModule : EverestModule
         // We create a static CrystalStaticSpinner which needs to access Tags.TransitionUpdate
         // Which wouldn't be loaded in time for EverestModule.Load
         TimedTriggerSpikes.LoadDelayed();
-        
+
         // Because of StrawberryJam, trying to hook the LaserEmitter codebase breaks the Laser Emitters because both the CommunalHelper and StrawberryJam hooks cannot be cross-compatible
         // (at least until we can update StrawberryJam to fix it)
         // Therefore, we load this hook conditionally dependent on if StrawberryJam has loaded its hooks, and use the same flags it uses to achieve the same effect
         // This also makes both StrawberryJam's and CommunalHelper's flags intercompatible
-        if(Everest.Loader.DependencyLoaded(new EverestModuleMetadata { Name = "StrawberryJam2021", Version = new Version("1.0.0") })) {
+        if (Everest.Loader.DependencyLoaded(new EverestModuleMetadata { Name = "StrawberryJam2021", Version = new Version("1.0.0") }))
+        {
             LaserEmitter.Load();
         }
 
@@ -279,15 +290,14 @@ public class CommunalHelperModule : EverestModule
 
         HeartGemShard.InitializeParticles();
 
-        Melvin.InitializeTextures();
-        Melvin.InitializeParticles();
-
         RailedMoveBlock.InitializeTextures();
         DreamBooster.InitializeParticles();
         CurvedBooster.InitializeParticles();
 
-        DreamJellyfish.InitializeTextures();
+        DreamSpriteRenderer.InitializeTextures();
+
         DreamJellyfish.InitializeParticles();
+        DreamTheoCrystal.InitializeParticles();
 
         Chain.InitializeTextures();
 
@@ -362,18 +372,16 @@ public class CommunalHelperModule : EverestModule
     }
 
     private object CustomBirdTutorial_OnParseCommand(string command)
-    {
-        // Thank you maddie.
-        if (command == "CommunalHelperSyncedZipMoverBinding")
+        => command switch
         {
-            return Settings.AllowActivateRebinding ?
-                Settings.ActivateSyncedZipMovers.Button : Input.Grab;
-        }
+            "CommunalHelperSyncedZipMoverBinding" when Settings.AllowActivateRebinding => Settings.ActivateSyncedZipMovers.Button,
+            "CommunalHelperSyncedZipMoverBinding" => Input.Grab,
+            "CommunalHelperCycleCassetteBlocksBinding" => Settings.CycleCassetteBlocks.Button,
+            "CommunalHelperActivateFlagControllerBinding" => Settings.ActivateFlagController.Button,
+            "CommunalHelperDeployElytraBinding" => Settings.DeployElytra.Button,
 
-        return command == "CommunalHelperCycleCassetteBlocksBinding"
-            ? Settings.CycleCassetteBlocks.Button
-            : command == "CommunalHelperActivateFlagControllerBinding" ? Settings.ActivateFlagController.Button : (object) null;
-    }
+            _ => null,
+        };
 }
 
 // Don't worry about it

@@ -3,6 +3,8 @@ using Celeste.Mod.CommunalHelper.Imports;
 using Celeste.Mod.Helpers;
 using FMOD.Studio;
 using Microsoft.Xna.Framework.Graphics;
+using Mono.Cecil.Cil;
+using MonoMod.Cil;
 using MonoMod.Utils;
 using System.Collections;
 using System.Collections.Generic;
@@ -192,7 +194,7 @@ public static class Extensions
         foreach (Type subType in method.DeclaringType.GetSubClasses())
         {
             MethodInfo overrideMethod = subType.GetMethod(method.Name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly);
-            if (overrideMethod != null && overrideMethod.Attributes.HasFlag(MethodAttributes.Virtual) && overrideMethod.GetBaseDefinition() == method)
+            if (overrideMethod is not null && overrideMethod.Attributes.HasFlag(MethodAttributes.Virtual) && overrideMethod.GetBaseDefinition() == method)
                 list.Add(overrideMethod);
 
         }
@@ -221,22 +223,6 @@ public static class Extensions
     }
 
     // Dream Tunnel Dash related extension methods located in DreamTunnelDash.cs
-
-    internal static bool CelesteTASLoaded;
-    internal static MethodInfo CelesteTAS_PlayerStates_Register;
-    internal static MethodInfo CelesteTAS_PlayerStates_Unregister;
-
-    public static void RegisterState(int state, string stateName)
-    {
-        if (CelesteTASLoaded)
-            CelesteTAS_PlayerStates_Register.Invoke(null, new object[] { state, stateName });
-    }
-
-    public static void UnregisterState(int state)
-    {
-        if (CelesteTASLoaded)
-            CelesteTAS_PlayerStates_Unregister.Invoke(null, new object[] { state });
-    }
 
     internal static bool MoreDashelineLoaded;
     internal static MethodInfo MoreDasheline_GetHairColor;
@@ -352,7 +338,7 @@ public static class Extensions
         {
             player.StateMachine.State = 0;
         }
-        if (player.StateMachine.State == 4 && player.CurrentBooster != null)
+        if (player.StateMachine.State == 4 && player.CurrentBooster is not null)
         {
             player.CurrentBooster.PlayerReleased();
         }
@@ -477,7 +463,7 @@ public static class Extensions
             {
                 current.Add(entity);
                 listEntities.Add(entity);
-                if (scene != null)
+                if (scene is not null)
                 {
                     m_TagLists_EntityAdded.Invoke(scene.TagLists, new object[] { entity });
                     m_Tracker_EntityAdded.Invoke(scene.Tracker, new object[] { entity });
@@ -494,41 +480,6 @@ public static class Extensions
                 entity.Awake(scene);
         }
     }
-
-
-    #region JaThePlayer's state machine extension code
-
-    /// <summary>
-    /// Adds a state to a StateMachine
-    /// </summary>
-    /// <returns>The index of the new state</returns>
-    public static int AddState(this StateMachine machine, Func<int> onUpdate, Func<IEnumerator> coroutine = null, Action begin = null, Action end = null)
-    {
-        Action[] begins = (Action[]) StateMachine_begins.GetValue(machine);
-        Func<int>[] updates = (Func<int>[]) StateMachine_updates.GetValue(machine);
-        Action[] ends = (Action[]) StateMachine_ends.GetValue(machine);
-        Func<IEnumerator>[] coroutines = (Func<IEnumerator>[]) StateMachine_coroutines.GetValue(machine);
-        int nextIndex = begins.Length;
-        // Now let's expand the arrays
-        Array.Resize(ref begins, begins.Length + 1);
-        Array.Resize(ref updates, begins.Length + 1);
-        Array.Resize(ref ends, begins.Length + 1);
-        Array.Resize(ref coroutines, coroutines.Length + 1);
-        // Store the resized arrays back into the machine
-        StateMachine_begins.SetValue(machine, begins);
-        StateMachine_updates.SetValue(machine, updates);
-        StateMachine_ends.SetValue(machine, ends);
-        StateMachine_coroutines.SetValue(machine, coroutines);
-        // And now we add the new functions
-        machine.SetCallbacks(nextIndex, onUpdate, coroutine, begin, end);
-        return nextIndex;
-    }
-    private static readonly FieldInfo StateMachine_begins = typeof(StateMachine).GetField("begins", BindingFlags.Instance | BindingFlags.NonPublic);
-    private static readonly FieldInfo StateMachine_updates = typeof(StateMachine).GetField("updates", BindingFlags.Instance | BindingFlags.NonPublic);
-    private static readonly FieldInfo StateMachine_ends = typeof(StateMachine).GetField("ends", BindingFlags.Instance | BindingFlags.NonPublic);
-    private static readonly FieldInfo StateMachine_coroutines = typeof(StateMachine).GetField("coroutines", BindingFlags.Instance | BindingFlags.NonPublic);
-
-    #endregion
 
     public static Vector2 PutInside(this Entity entity, Vector2 pos)
     {
@@ -579,11 +530,20 @@ public static class Extensions
         return new(left, top, right - left, bottom - top);
     }
 
-    public static bool Collides(this Camera self, Entity entity, Collider collider, float extend = 32f) =>
-        entity.Position.X + collider.Right >= self.Left - extend &&
-        entity.Position.X + collider.Left <= self.Right + extend &&
-        entity.Position.Y + collider.Bottom >= self.Top - extend &&
-        entity.Position.Y + collider.Top <= self.Bottom + extend;
+    public static bool Collides(this Camera self, Entity entity, Collider collider = null, float extend = 32f)
+    {
+        collider ??= entity.Collider;
+        return entity.Position.X + collider.Right >= self.Left - extend &&
+               entity.Position.X + collider.Left <= self.Right + extend &&
+               entity.Position.Y + collider.Bottom >= self.Top - extend &&
+               entity.Position.Y + collider.Top <= self.Bottom + extend;
+    }
+
+    public static bool Contains(this Camera self, Vector2 point, float extend = 32f) =>
+        point.X >= self.Left - extend &&
+        point.X <= self.Right + extend &&
+        point.Y >= self.Top - extend &&
+        point.Y <= self.Bottom + extend;
 
     public static TextMenuExt.OptionSubMenu Add(this TextMenuExt.OptionSubMenu menu, string label, params TextMenu.Item[] items)
     {
@@ -820,4 +780,298 @@ public static class Extensions
         if (rect.Contains(new Rectangle((int) pos.X - (int) origin.X, (int) pos.Y - (int) origin.Y, mTexture.Width, mTexture.Height)))
             mTexture.Draw(pos, origin, color);
     }
+
+    public static T AttrEnum<T>(this BinaryPacker.Element el, string name, T defaultValue) where T : struct, Enum
+    {
+        return el.Attributes.TryGetValue(name, out object value)
+               && Enum.TryParse(value.ToString(), true, out T result) ? result : defaultValue;
+    }
+    
+    #region ILCursor extensions
+    
+    /// <summary>
+    /// Go to the next match of a given IL sequence, allowing up to <paramref name="maxInstructionSpread"/> instructions of tolerance if the instructions are not sequential (i.e. if something else hooks the same sequence).
+    /// </summary>
+    /// <param name="cursor">The IL cursor to look for a match in.</param>
+    /// <param name="moveType">The move type to use.</param>
+    /// <param name="maxInstructionSpread">The amount of instructions between predicate matches to still consider as a successful match.</param>
+    /// <param name="predicates">The IL instructions to match against.</param>
+    /// <remarks>
+    /// This function picks the first match, which might not have the least possible instruction spread.<br/>
+    /// For that, see <see cref="Helpers.ILCursorExtensions.TryGotoNextBestFit(ILCursor,MoveType,int,Func&lt;Instruction,bool&gt;[])"/>.
+    /// </remarks>
+    /// <returns>Whether a match has been found, and the cursor has been moved.</returns>
+    public static bool TryGotoNextFirstFit(this ILCursor cursor, MoveType moveType, int maxInstructionSpread, params Func<Instruction, bool>[] predicates)
+    {
+        if (predicates.Length == 0)
+        {
+            throw new ArgumentException("No predicates given.");
+        }
+
+        if (predicates.Length == 1)
+        {
+            return cursor.TryGotoNext(moveType, predicates[0]);
+        }
+
+        int matchFrom = -1, matchTo = -1;
+        while (cursor.TryGotoNext(MoveType.Before, predicates[0]))
+        {
+            matchFrom = cursor.Index++;
+            bool flag = true;
+            for (int i = 1; i < predicates.Length; i++)
+            {
+                Func<Instruction, bool> func = predicates[i];
+                int index = cursor.Index;
+                if (!cursor.TryGotoNext(MoveType.After, func))
+                {
+                    flag = false;
+                    break;
+                }
+
+                int instructionSpread = cursor.Index - index;
+                if (instructionSpread > maxInstructionSpread)
+                {
+                    flag = false;
+                    break;
+                }
+            }
+
+            if (flag)
+            {
+                matchTo = cursor.Index;
+                break;
+            }
+
+            cursor.Index = matchFrom + 1;
+        }
+
+        if (matchFrom == -1 || matchTo == -1)
+        {
+            return false;
+        }
+
+        cursor.Index = moveType != MoveType.After ? matchFrom : matchTo;
+        if (moveType == MoveType.AfterLabel)
+        {
+            cursor.MoveAfterLabels();
+        }
+
+        return true;
+    }
+    
+    /// <summary>
+    /// Go to the previous match of a given IL sequence, allowing up to <paramref name="maxInstructionSpread"/> instructions of tolerance if the instructions are not sequential (i.e. if something else hooks the same sequence).
+    /// </summary>
+    /// <param name="cursor">The IL cursor to look for a match in.</param>
+    /// <param name="moveType">The move type to use.</param>
+    /// <param name="maxInstructionSpread">The amount of instructions between predicate matches to still consider as a successful match.</param>
+    /// <param name="predicates">The IL instructions to match against.</param>
+    /// <remarks>
+    /// This function picks the first match, which might not have the least possible instruction spread.<br/>
+    /// For that, see <see cref="Helpers.ILCursorExtensions.TryGotoPrevBestFit(ILCursor,MoveType,int,Func&lt;Instruction,bool&gt;[])"/>.
+    /// </remarks>
+    /// <returns>Whether a match has been found, and the cursor has been moved.</returns>
+    public static bool TryGotoPrevFirstFit(this ILCursor cursor, MoveType moveType, int maxInstructionSpread, params Func<Instruction, bool>[] predicates)
+    {
+        if (predicates.Length == 0)
+        {
+            throw new ArgumentException("No predicates given.");
+        }
+
+        if (predicates.Length == 1)
+        {
+            return cursor.TryGotoPrev(moveType, predicates[0]);
+        }
+
+        int matchFrom = -1, matchTo = -1;
+        while (cursor.TryGotoPrev(MoveType.Before, predicates[0]))
+        {
+            matchFrom = cursor.Index++;
+            bool flag = true;
+            for (int i = 1; i < predicates.Length; i++)
+            {
+                Func<Instruction, bool> func = predicates[i];
+                int index = cursor.Index;
+                if (!cursor.TryGotoNext(MoveType.After, func))
+                {
+                    flag = false;
+                    break;
+                }
+
+                int instructionSpread = cursor.Index - index;
+                if (instructionSpread > maxInstructionSpread)
+                {
+                    flag = false;
+                    break;
+                }
+            }
+
+            if (flag)
+            {
+                matchTo = cursor.Index;
+                break;
+            }
+
+            cursor.Index = matchFrom;
+        }
+
+        if (matchFrom == -1 || matchTo == -1)
+        {
+            return false;
+        }
+
+        cursor.Index = moveType != MoveType.After ? matchFrom : matchTo;
+        if (moveType == MoveType.AfterLabel)
+        {
+            cursor.MoveAfterLabels();
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Go to the next match of a given IL sequence, allowing up to <paramref name="maxInstructionSpread"/> instructions of tolerance if the instructions are not sequential (i.e. if something else hooks the same sequence), checking the match in reverse order.
+    /// </summary>
+    /// <param name="cursor">The IL cursor to look for a match in.</param>
+    /// <param name="moveType">The move type to use.</param>
+    /// <param name="maxInstructionSpread">The amount of instructions between predicate matches to still consider as a successful match.</param>
+    /// <param name="predicates">The IL instructions to match against.</param>
+    /// <remarks>
+    /// This function picks the first match, which might not have the least possible instruction spread.<br/>
+    /// For that, see <see cref="Helpers.ILCursorExtensions.TryGotoNextBestFit(ILCursor,MoveType,int,Func&lt;Instruction,bool&gt;[])"/>.<br/>
+    /// This function also checks its match predicates in reverse order, starting from the last.<br/>
+    /// If you do not want this behavior, see <see cref="TryGotoNextFirstFit"/>.
+    /// </remarks>
+    /// <returns>Whether a match has been found, and the cursor has been moved.</returns>
+    public static bool TryGotoNextFirstFitReversed(this ILCursor cursor, MoveType moveType, int maxInstructionSpread, params Func<Instruction, bool>[] predicates)
+    {
+        if (predicates.Length == 0)
+        {
+            throw new ArgumentException("No predicates given.");
+        }
+
+        if (predicates.Length == 1)
+        {
+            return cursor.TryGotoNext(moveType, predicates[0]);
+        }
+
+        int matchFrom = -1, matchTo = -1;
+        while (cursor.TryGotoNext(MoveType.Before, predicates[^1]))
+        {
+            matchTo = cursor.Index + 1;
+            bool flag = true;
+            for (int i = predicates.Length - 2; i >= 0; i--)
+            {
+                Func<Instruction, bool> func = predicates[i];
+                int index = cursor.Index;
+                if (!cursor.TryGotoPrev(MoveType.Before, func))
+                {
+                    flag = false;
+                    break;
+                }
+
+                int instructionSpread = index - cursor.Index;
+                if (instructionSpread > maxInstructionSpread)
+                {
+                    flag = false;
+                    break;
+                }
+            }
+
+            if (flag)
+            {
+                matchFrom = cursor.Index;
+                break;
+            }
+
+            cursor.Index = matchTo + 1;
+        }
+
+        if (matchFrom == -1 || matchTo == -1)
+        {
+            return false;
+        }
+
+        cursor.Index = moveType != MoveType.After ? matchFrom : matchTo;
+        if (moveType == MoveType.AfterLabel)
+        {
+            cursor.MoveAfterLabels();
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Go to the previous match of a given IL sequence, allowing up to <paramref name="maxInstructionSpread"/> instructions of tolerance if the instructions are not sequential (i.e. if something else hooks the same sequence), checking the match in reverse order.
+    /// </summary>
+    /// <param name="cursor">The IL cursor to look for a match in.</param>
+    /// <param name="moveType">The move type to use.</param>
+    /// <param name="maxInstructionSpread">The amount of instructions between predicate matches to still consider as a successful match.</param>
+    /// <param name="predicates">The IL instructions to match against.</param>
+    /// <remarks>
+    /// This function picks the first match, which might not have the least possible instruction spread.<br/>
+    /// For that, see <see cref="Helpers.ILCursorExtensions.TryGotoPrevBestFit(ILCursor,MoveType,int,Func&lt;Instruction,bool&gt;[])"/>.<br/>
+    /// This function also checks its match predicates in reverse order, starting from the last.<br/>
+    /// If you do not want this behavior, see <see cref="TryGotoNextFirstFit"/>.
+    /// </remarks>
+    /// <returns>Whether a match has been found, and the cursor has been moved.</returns>
+    public static bool TryGotoPrevFirstFitReversed(this ILCursor cursor, MoveType moveType, int maxInstructionSpread, params Func<Instruction, bool>[] predicates)
+    {
+        if (predicates.Length == 0)
+        {
+            throw new ArgumentException("No predicates given.");
+        }
+
+        if (predicates.Length == 1)
+        {
+            return cursor.TryGotoPrev(moveType, predicates[0]);
+        }
+
+        int matchFrom = -1, matchTo = -1;
+        while (cursor.TryGotoPrev(MoveType.Before, predicates[^1]))
+        {
+            matchTo = cursor.Index + 1;
+            bool flag = true;
+            for (int i = predicates.Length - 2; i >= 0; i--)
+            {
+                Func<Instruction, bool> func = predicates[i];
+                int index = cursor.Index;
+                if (!cursor.TryGotoPrev(MoveType.Before, func))
+                {
+                    flag = false;
+                    break;
+                }
+
+                int instructionSpread = index - cursor.Index;
+                if (instructionSpread > maxInstructionSpread)
+                {
+                    flag = false;
+                    break;
+                }
+            }
+
+            if (flag)
+            {
+                matchFrom = cursor.Index;
+                break;
+            }
+
+            cursor.Index = matchFrom;
+        }
+
+        if (matchFrom == -1 || matchTo == -1)
+        {
+            return false;
+        }
+
+        cursor.Index = moveType != MoveType.After ? matchFrom : matchTo;
+        if (moveType == MoveType.AfterLabel)
+        {
+            cursor.MoveAfterLabels();
+        }
+
+        return true;
+    }
+    
+    #endregion
 }

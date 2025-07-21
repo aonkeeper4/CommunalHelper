@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Reflection;
 
 namespace Celeste.Mod.CommunalHelper;
 
@@ -42,15 +41,6 @@ internal static class OptionalDependencies
         {
             Extensions.CollabUtils_MiniHeart = module.GetType().Module.GetType("Celeste.Mod.CollabUtils2.Entities.MiniHeart", ignoreCase: false, throwOnError: true);
             Extensions.CollabUtilsLoaded = true;
-        };
-        // Used for registering custom playerstates for display in CelesteTAS
-        meta = new EverestModuleMetadata { Name = "CelesteTAS", VersionString = "3.4.5" };
-        optionalDepLoaders[meta] = module =>
-        {
-            Type t_PlayerStates = module.GetType().Module.GetType("TAS.PlayerStates", ignoreCase: false, throwOnError: true);
-            Extensions.CelesteTAS_PlayerStates_Register = t_PlayerStates.GetMethod("Register", BindingFlags.Public | BindingFlags.Static, throwOnNull: true);
-            Extensions.CelesteTAS_PlayerStates_Unregister = t_PlayerStates.GetMethod("Unregister", BindingFlags.Public | BindingFlags.Static, throwOnNull: true);
-            Extensions.CelesteTASLoaded = true;
         };
         meta = new EverestModuleMetadata { Name = "MaxHelpingHand", VersionString = "1.9.3" };
         optionalDepLoaders[meta] = module => MaxHelpingHandLoaded = true;

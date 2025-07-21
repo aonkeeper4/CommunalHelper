@@ -12,6 +12,7 @@ public class HintController : Entity
     public bool[] SingleUses { get; }
     public string SelectorCounter { get; }
     public bool SelectNextHint { get; }
+    public string FlagWhileReading { get; private set; }
 
     private int CurrentSelector
     {
@@ -50,6 +51,8 @@ public class HintController : Entity
     {
         TitleDialog = data.Attr("titleDialog", "");
         if (string.IsNullOrWhiteSpace(TitleDialog)) TitleDialog = "communalhelper_entities_hint_controller_menu";
+
+        FlagWhileReading = data.Attr("flagWhileReading", "");
 
         DialogIds = data.Attr("dialogIds")
             .Split(CommaSeparator, StringSplitOptions.RemoveEmptyEntries)
@@ -117,7 +120,7 @@ public class HintController : Entity
 
         var hintControllers = level.Entities.FindAll<HintController>();
         int index = retryIndex;
-        if (hintControllers != null && hintControllers.Count > 0)
+        if (hintControllers is not null && hintControllers.Count > 0)
         {
             foreach (HintController hintController in hintControllers)
             {
@@ -147,9 +150,12 @@ public class HintController : Entity
 
     private IEnumerator ShowHintSequence()
     {
+        Level lvl = SceneAs<Level>();
+        lvl.Session.SetFlag(FlagWhileReading, true);
         showingHint = true;
         yield return Textbox.Say(CurrentDialogId);
         showingHint = false;
+        lvl.Session.SetFlag(FlagWhileReading, false);
 
         if (SelectNextHint && DialogIds.Length > 0 && !string.IsNullOrWhiteSpace(SelectorCounter))
         {
@@ -157,8 +163,6 @@ public class HintController : Entity
         }
 
         if (Scene is Level level)
-        {
             level.Paused = false;
-        }
     }
 }

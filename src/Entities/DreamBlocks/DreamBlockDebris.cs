@@ -5,13 +5,13 @@ namespace Celeste.Mod.CommunalHelper.Entities;
 [Pooled]
 public class DreamBlockDebris : Debris
 {
-    private static readonly Color[] activeParticleColors = new Color[] {
-            Calc.HexToColor("FFEF11"),
-            Calc.HexToColor("08A310"),
-            Calc.HexToColor("FF00D0"),
-            Calc.HexToColor("5FCDE4"),
-            Calc.HexToColor("E0564C")
-    };
+    private static readonly Color[] activeParticleColors = [
+        Calc.HexToColor("FFEF11"),
+        Calc.HexToColor("08A310"),
+        Calc.HexToColor("FF00D0"),
+        Calc.HexToColor("5FCDE4"),
+        Calc.HexToColor("E0564C")
+    ];
 
     public DreamBlockDummy Block;
 
@@ -97,7 +97,7 @@ public class DreamBlockDebris : Debris
     {
         base.Render();
         Color? pointColor = Block.PlayerHasDreamDash ? activePointColor : disabledPointColor;
-        if (activePointColor != null)
+        if (activePointColor is not null)
             Draw.Point(Center + pointOffset, pointColor.Value);
     }
 

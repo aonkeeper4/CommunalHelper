@@ -1,5 +1,8 @@
-﻿using MonoMod.Utils;
-using System.Collections.Generic;
+﻿using Mono.Cecil.Cil;
+using MonoMod.Cil;
+using MonoMod.RuntimeDetour;
+using MonoMod.Utils;
+using System.Reflection;
 using Directions = Celeste.MoveBlock.Directions;
 
 namespace Celeste.Mod.CommunalHelper.Entities;
@@ -14,10 +17,8 @@ internal class ChainedKevin : CrushBlock
     private readonly int chainLength;
     private bool centeredChain;
     private readonly bool chainOutline;
+    private readonly float retractSpeedModifier;
     private readonly MTexture chainTexture;
-
-    private DynamicData crushBlockData;
-    private List<Image> idleImages, activeTopImages, activeRightImages, activeLeftImages, activeBottomImages;
 
     public ChainedKevin(EntityData data, Vector2 offset)
         : base(data, offset)
@@ -25,6 +26,12 @@ internal class ChainedKevin : CrushBlock
         start = Position;
         chainLength = data.Int("chainLength", 64);
         chainOutline = data.Bool("chainOutline", true);
+        retractSpeedModifier = data.Float("retractSpeedModifier", 1.0f);
+        if (retractSpeedModifier <= 0)
+        {
+            Logger.Warn("CommunalHelper", "Invalid chained kevin retract speed modifier! Setting to 1.0 (default).");
+            retractSpeedModifier = 1.0f;
+        }
         if (((direction == Directions.Up || direction == Directions.Down) && Width <= 8) ||
             ((direction == Directions.Left || direction == Directions.Right) && Height <= 8))
             centeredChain = true;
@@ -81,7 +88,11 @@ internal class ChainedKevin : CrushBlock
         base.Render();
     }
 
+
+
     #region Hooks
+
+    private static ILHook il_CrushBlock_AttackSequence_MoveNext;
 
     internal static void Load()
     {
@@ -91,6 +102,11 @@ internal class ChainedKevin : CrushBlock
         On.Celeste.CrushBlock.CanActivate += CrushBlock_CanActivate;
         On.Celeste.CrushBlock.MoveHCheck += CrushBlock_MoveHCheck;
         On.Celeste.CrushBlock.MoveVCheck += CrushBlock_MoveVCheck;
+
+        il_CrushBlock_AttackSequence_MoveNext = new ILHook(
+            typeof(CrushBlock).GetMethod("AttackSequence", BindingFlags.NonPublic | BindingFlags.Instance).GetStateMachineTarget(),
+            IL_CrushBlock_AttackSequence
+        );
     }
 
     internal static void Unload()
@@ -101,6 +117,19 @@ internal class ChainedKevin : CrushBlock
         On.Celeste.CrushBlock.CanActivate -= CrushBlock_CanActivate;
         On.Celeste.CrushBlock.MoveHCheck -= CrushBlock_MoveHCheck;
         On.Celeste.CrushBlock.MoveVCheck -= CrushBlock_MoveVCheck;
+
+        il_CrushBlock_AttackSequence_MoveNext.Dispose(); il_CrushBlock_AttackSequence_MoveNext = null;
+    }
+
+    private static void IL_CrushBlock_AttackSequence(ILContext il)
+    {
+        ILCursor cursor = new(il);
+
+        cursor.GotoNext(instr => instr.MatchLdstr(SFX.game_06_crushblock_return_loop));
+        cursor.GotoNext(MoveType.After, instr => instr.MatchLdcR4(60.0f));
+
+        cursor.Emit(OpCodes.Ldloc_1);
+        cursor.EmitDelegate((float speed, CrushBlock e) => e is ChainedKevin block ? block.retractSpeedModifier * speed : speed);
     }
 
     private static bool CrushBlock_MoveVCheck(On.Celeste.CrushBlock.orig_MoveVCheck orig, CrushBlock self, float amount)
@@ -171,7 +200,6 @@ internal class ChainedKevin : CrushBlock
     {
         if (self is ChainedKevin chainedKevin)
         {
-            chainedKevin.crushBlockData = new(typeof(CrushBlock), chainedKevin);
             chainedKevin.vectorDirection = (chainedKevin.direction = data.Enum("direction", Directions.Right)).Vector();
             chainedKevin.centeredChain = data.Bool("centeredChain");
         }
@@ -187,6 +215,7 @@ internal class ChainedKevin : CrushBlock
             else if (chainedKevin.direction is Directions.Left or Directions.Right)
                 axes = Axes.Horizontal;
         }
+
         orig(self, position, width, height, axes, chillOut);
     }
 
@@ -194,15 +223,6 @@ internal class ChainedKevin : CrushBlock
     {
         if (self is ChainedKevin chainedKevin)
         {
-            if (chainedKevin.idleImages == null)
-            {
-                chainedKevin.idleImages = chainedKevin.crushBlockData.Get<List<Image>>("idleImages");
-                chainedKevin.activeTopImages = chainedKevin.crushBlockData.Get<List<Image>>("activeTopImages");
-                chainedKevin.activeRightImages = chainedKevin.crushBlockData.Get<List<Image>>("activeRightImages");
-                chainedKevin.activeLeftImages = chainedKevin.crushBlockData.Get<List<Image>>("activeLeftImages");
-                chainedKevin.activeBottomImages = chainedKevin.crushBlockData.Get<List<Image>>("activeBottomImages");
-            }
-
             MTexture subtexture = GFX.Game["objects/CommunalHelper/chainedKevin/block" + chainedKevin.direction].GetSubtexture(tx * 8, ty * 8, 8, 8);
             Vector2 vector = new(x * 8, y * 8);
 

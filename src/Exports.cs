@@ -1,6 +1,8 @@
 using Celeste.Mod.CommunalHelper.Components;
 using Celeste.Mod.CommunalHelper.DashStates;
+using Celeste.Mod.CommunalHelper.States;
 using MonoMod.ModInterop;
+using DreamTunnelDash = Celeste.Mod.CommunalHelper.DashStates.DreamTunnelDash;
 
 namespace Celeste.Mod.CommunalHelper;
 
@@ -9,6 +11,7 @@ public static class ModExports
     internal static void Initialize()
     {
         typeof(DashStates).ModInterop();
+        typeof(Entities).ModInterop();
     }
 
     [ModExportName("CommunalHelper.DashStates")]
@@ -18,7 +21,7 @@ public static class ModExports
 
         public static int GetDreamTunnelDashState()
         {
-            return DreamTunnelDash.StDreamTunnelDash;
+            return St.DreamTunnelDash;
         }
 
         public static bool HasDreamTunnelDash()
@@ -53,4 +56,20 @@ public static class ModExports
         #endregion
     }
 
+    [ModExportName("CommunalHelper.Entities")]
+    public static class Entities
+    {
+        #region Misc
+        
+        #region Melvin
+
+        public static Component MelvinTargetable(int priority)
+        {
+            return new MelvinTargetable(priority);
+        }
+
+        #endregion
+        
+        #endregion
+    }
 }

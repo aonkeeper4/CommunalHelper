@@ -4,11 +4,9 @@
 public class MoveBlockDebris : Actor
 {
     public Action<Image> OnUpdateSprite;
-
     public Image Sprite;
 
     private Vector2 home;
-
     private Vector2 speed;
 
     private bool shaking;
@@ -45,9 +43,7 @@ public class MoveBlockDebris : Actor
         };
     }
 
-    public override void OnSquish(CollisionData data)
-    {
-    }
+    public override void OnSquish(CollisionData data) { }
 
     public MoveBlockDebris Init(Vector2 position, Vector2 center, Vector2 returnTo, Action<Image> onUpdateSprite = null)
     {
@@ -73,15 +69,19 @@ public class MoveBlockDebris : Actor
     {
         base.Update();
 
+        bool isInBounds = SceneAs<Level>().IsInBounds(this);
+
         Sprite.Color = Color.White;
         Sprite.Scale = Vector2.One;
+        Sprite.Visible = isInBounds;
         OnUpdateSprite?.Invoke(Sprite);
 
         if (!returning)
         {
-            if (Collidable)
+            if (Collidable && isInBounds)
             {
                 speed.X = Calc.Approach(speed.X, 0f, Engine.DeltaTime * 100f);
+
                 if (!OnGround(1))
                 {
                     speed.Y += 400f * Engine.DeltaTime;
@@ -123,25 +123,13 @@ public class MoveBlockDebris : Actor
 
     public void ReturnHome(float duration)
     {
-        if (Scene != null)
+        if (Scene is not null)
         {
             Camera camera = (Scene as Level).Camera;
-            if (X < camera.X)
-            {
-                X = camera.X - 8f;
-            }
-            if (Y < camera.Y)
-            {
-                Y = camera.Y - 8f;
-            }
-            if (X > camera.X + 320f)
-            {
-                X = camera.X + 320f + 8f;
-            }
-            if (Y > camera.Y + 180f)
-            {
-                Y = camera.Y + 180f + 8f;
-            }
+            if (X < camera.X) X = camera.X - 8f;
+            if (Y < camera.Y) Y = camera.Y - 8f;
+            if (X > camera.X + 320f) X = camera.X + 320f + 8f;
+            if (Y > camera.Y + 180f) Y = camera.Y + 180f + 8f;
         }
         returning = true;
         returnEase = 0f;

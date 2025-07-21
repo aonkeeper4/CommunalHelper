@@ -47,9 +47,11 @@ aeroBlockCharged.placements = {
             activeColor = "4BC0C8",
             inactiveColor = "FF6347",
             easing = "CubeIn",
-            SpirialisBug = false,
+            -- SpirialisBug = false,
+            SpirialisBugV2 = false,
+            wallbounceLeniency = true,
             cassetteIndex = -1,
-            moveOnCassetteTick = false,
+            moveOnCassetteTick = false
         }
     }
 }

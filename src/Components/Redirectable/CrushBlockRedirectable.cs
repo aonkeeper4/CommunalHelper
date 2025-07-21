@@ -1,4 +1,3 @@
-using Celeste.Mod.CommunalHelper.Components;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
 using MonoMod.Cil;
@@ -8,7 +7,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 
-namespace Celeste.Mod.CommunalHelper.Entities;
+namespace Celeste.Mod.CommunalHelper.Components;
 
 internal class CrushBlockRedirectable : Redirectable
 {
@@ -71,16 +70,13 @@ internal class CrushBlockRedirectable : Redirectable
             imagesToActivate = Data.Get<List<Image>>("activeBottomImages");
         }
 
-        if (newFaceDirection != null)
-        {
+        if (newFaceDirection is not null)
             Data.Set("nextFaceDirection", newFaceDirection);
-        }
-        if (imagesToActivate != null)
+
+        if (imagesToActivate is not null)
         {
             foreach (Image activeImage in imagesToActivate)
-            {
                 activeImage.Visible = true;
-            }
         }
 
 
@@ -220,10 +216,8 @@ internal class CrushBlockRedirectable : Redirectable
             cursor.EmitDelegate((float speed, CrushBlock crushBlock) =>
             {
                 CrushBlockRedirectable redirectable = (CrushBlockRedirectable) crushBlock.Components.Get<Redirectable>();
-                if (redirectable != null)
-                {
+                if (redirectable is not null)
                     redirectable.Speed = speed;
-                }
             });
         }
     }
@@ -231,7 +225,7 @@ internal class CrushBlockRedirectable : Redirectable
     private static DashCollisionResults CrushBlock_OnDashed(On.Celeste.CrushBlock.orig_OnDashed orig, CrushBlock self, Player player, Vector2 direction)
     {
         CrushBlockRedirectable redirectable = (CrushBlockRedirectable) self.Components.Get<Redirectable>();
-        if (redirectable != null && redirectable.isStuck)
+        if (redirectable is not null && redirectable.isStuck)
         {
             return DashCollisionResults.NormalCollision;
         }
@@ -242,7 +236,7 @@ internal class CrushBlockRedirectable : Redirectable
     private static void CrushBlock_Attack(On.Celeste.CrushBlock.orig_Attack orig, CrushBlock self, Vector2 direction)
     {
         CrushBlockRedirectable redirectable = (CrushBlockRedirectable) self.Components.Get<Redirectable>();
-        if (redirectable != null)
+        if (redirectable is not null)
         {
             redirectable.IsRedirectable = true;
         }
@@ -275,7 +269,7 @@ internal class CrushBlockRedirectable : Redirectable
     {
         Redirectable redirectable = self.Components.Get<Redirectable>();
 
-        if (redirectable != null)
+        if (redirectable is not null)
         {
             redirectable.IsRedirectable = false;
             redirectable.TargetSpeed = CRASH_BLOCK_DEFAULT_MAX_SPEED;

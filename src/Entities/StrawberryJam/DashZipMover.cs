@@ -1,7 +1,6 @@
 ﻿using Celeste.Mod.CommunalHelper;
 using System.Collections;
 using System.Collections.Generic;
-using static MonoMod.Cil.RuntimeILReferenceBag;
 
 namespace Celeste.Mod.CommunalHelper.Entities.StrawberryJam
 {
@@ -18,12 +17,12 @@ namespace Celeste.Mod.CommunalHelper.Entities.StrawberryJam
             private Vector2 to;
 
             private Vector2 sparkAdd;
-            private float sparkDirFromA;
-            private float sparkDirFromB;
-            private float sparkDirToA;
-            private float sparkDirToB;
+            private readonly float sparkDirFromA;
+            private readonly float sparkDirFromB;
+            private readonly float sparkDirToA;
+            private readonly float sparkDirToB;
 
-            private float length;
+            private readonly float length;
 
             private Color ropeColor = Calc.HexToColor("046e19");
             private Color ropeLightColor = Calc.HexToColor("329415");
@@ -71,8 +70,8 @@ namespace Celeste.Mod.CommunalHelper.Entities.StrawberryJam
                 if (zipMover.drawBlackBorder)
                 {
                     Rectangle outline = new Rectangle(
-                        (int) (Math.Round(zipMover.X - ((zipMover.scale.X - 1) * zipMover.Width) / 2f) + zipMover.Shake.X),
-                        (int) (Math.Round(zipMover.Y - ((zipMover.scale.Y - 1) * zipMover.Height) / 2f) + zipMover.Shake.Y),
+                        (int) (Math.Round(zipMover.X - (zipMover.scale.X - 1) * zipMover.Width / 2f) + zipMover.Shake.X),
+                        (int) (Math.Round(zipMover.Y - (zipMover.scale.Y - 1) * zipMover.Height / 2f) + zipMover.Shake.Y),
                         (int) (zipMover.Width * 0.125f * MathF.Round(8 * zipMover.scale.X)),  // The width/height here needs to be handled relative to the Rounding value of the individually drawn patch segments
                         (int) (zipMover.Height * 0.125f * MathF.Round(8 * zipMover.scale.Y))  // As opposed to the width. Round(8 * 2/3) * (x / 8) != Round(x * 2/3)
                     );
@@ -104,7 +103,7 @@ namespace Celeste.Mod.CommunalHelper.Entities.StrawberryJam
                     Vector2 p2to = to + value2 - vector * num + sinOffset + offset;
 
                     // Thicker vine rope, in the back, sort of outline
-                    if (colorOverride != null)
+                    if (colorOverride is not null)
                     {
                         Draw.Line(p1from, p1to, (Color) colorOverride, 3);
                         Draw.Line(p2from, p2to, (Color) colorOverride, 3);
@@ -127,14 +126,14 @@ namespace Celeste.Mod.CommunalHelper.Entities.StrawberryJam
             }
         }
 
-        private MTexture[,] edges = new MTexture[3, 3];
+        private readonly MTexture[,] edges = new MTexture[3, 3];
 
-        private Sprite streetlight;
-        private BloomPoint bloom;
+        private readonly Sprite streetlight;
+        private readonly BloomPoint bloom;
 
         private DashZipMoverPathRenderer pathRenderer;
-        private List<MTexture> innerCogs;
-        private MTexture temp = new MTexture();
+        private readonly List<MTexture> innerCogs;
+        private readonly MTexture temp = new();
 
         private Vector2 start;
         private Vector2 target;
@@ -143,18 +142,23 @@ namespace Celeste.Mod.CommunalHelper.Entities.StrawberryJam
 
         private Vector2 scale = Vector2.One;
 
-        private SoundSource sfx = new SoundSource();
+        private readonly SoundSource sfx = new();
 
-        private bool drawBlackBorder;
+        private readonly bool drawBlackBorder;
 
-        private string soundEvent;
+        private readonly string soundEvent;
 
-        public DashZipMover(Vector2 position, int width, int height, Vector2 target, string spritePath, bool drawBlackBorder, Color ropeColor, Color ropeLightColor, Color ropeShadowColor, string sound)
+        private readonly bool slow;
+
+        private static readonly Ease.Easer EaseSevenHalves = Util.MakeCustomEaser(3.5f);
+
+        public DashZipMover(Vector2 position, int width, int height, Vector2 target, string spritePath, bool drawBlackBorder, Color ropeColor, Color ropeLightColor, Color ropeShadowColor, string sound, bool slow)
             : base(position, width, height, safe: false)
         {
             Depth = Depths.FGTerrain + 1;
             start = Position;
             this.target = target;
+            this.slow = slow;
 
             Add(new Coroutine(Sequence()));
             Add(new LightOcclude());
@@ -194,9 +198,8 @@ namespace Celeste.Mod.CommunalHelper.Entities.StrawberryJam
         }
 
         public DashZipMover(EntityData data, Vector2 offset)
-            : this(data.Position + offset, data.Width, data.Height, data.Nodes[0] + offset, data.Attr("spritePath", "objects/CommunalHelper/strawberryJam/dashZipMover/"), data.Bool("drawBlackBorder", false), Calc.HexToColor(data.Attr("ropeColor", "046e19")), Calc.HexToColor(data.Attr("ropeLightColor", "329415")), Calc.HexToColor(data.Attr("ropeShadowColor", "003622")), data.Attr("soundEvent", "event:/CommunalHelperEvents/game/strawberryJam/game/dash_zip_mover/zip_mover"))
-        {
-        }
+            : this(data.Position + offset, data.Width, data.Height, data.Nodes[0] + offset, data.Attr("spritePath", "objects/CommunalHelper/strawberryJam/dashZipMover/"), data.Bool("drawBlackBorder", false), Calc.HexToColor(data.Attr("ropeColor", "046e19")), Calc.HexToColor(data.Attr("ropeLightColor", "329415")), Calc.HexToColor(data.Attr("ropeShadowColor", "003622")), data.Attr("soundEvent", "event:/CommunalHelperEvents/game/strawberryJam/game/dash_zip_mover/zip_mover"), data.Bool("slow", false))
+        { }
 
         public DashCollisionResults OnDashed(Player player, Vector2 dir)
         {
@@ -374,6 +377,8 @@ namespace Celeste.Mod.CommunalHelper.Entities.StrawberryJam
         {
             Vector2 start = Position;
 
+            float factor = slow ? 1.75f : 1f;
+
             while (true)
             {
                 if (!triggered)
@@ -383,10 +388,11 @@ namespace Celeste.Mod.CommunalHelper.Entities.StrawberryJam
                 }
 
                 sfx.Play(soundEvent);
+                sfx.instance.setPitch(1 / factor);
 
                 Input.Rumble(RumbleStrength.Medium, RumbleLength.Short);
-                StartShaking(0.1f);
-                yield return 0.1f;
+                StartShaking(0.1f * factor);
+                yield return 0.1f * factor;
 
                 streetlight.SetAnimationFrame(3);
                 StopPlayerRunIntoAnimation = false;
@@ -396,8 +402,8 @@ namespace Celeste.Mod.CommunalHelper.Entities.StrawberryJam
                 while (at2 < 1f)
                 {
                     yield return null;
-                    at2 = Calc.Approach(at2, 1f, 2f * Engine.DeltaTime);
-                    percent = Ease.SineIn(at2);
+                    at2 = Calc.Approach(at2, 1f, 2f * Engine.DeltaTime * (1 / factor));
+                    percent = slow ? EaseSevenHalves(at2) : Ease.SineIn(at2);
                     Vector2 vector = Vector2.Lerp(start, target, percent);
                     ScrapeParticlesCheck(vector);
                     if (Scene.OnInterval(0.1f))
@@ -405,12 +411,12 @@ namespace Celeste.Mod.CommunalHelper.Entities.StrawberryJam
                     MoveTo(vector);
                 }
 
-                StartShaking(0.2f);
+                StartShaking(0.2f * factor);
                 Input.Rumble(RumbleStrength.Strong, RumbleLength.Medium);
                 streetlight.SetAnimationFrame(2);
                 SceneAs<Level>().Shake();
                 StopPlayerRunIntoAnimation = true;
-                yield return 0.5f;
+                yield return 0.5f * factor;
 
                 StopPlayerRunIntoAnimation = false;
                 streetlight.SetAnimationFrame(1);

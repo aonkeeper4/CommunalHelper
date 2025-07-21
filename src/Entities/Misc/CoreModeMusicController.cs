@@ -1,7 +1,7 @@
 ﻿using System.Linq;
 using static Celeste.Session;
 
-namespace Celeste.Mod.CommunalHelper.Entities.Misc;
+namespace Celeste.Mod.CommunalHelper.Entities;
 
 [CustomEntity("CommunalHelper/CoreModeMusicController")]
 [Tracked]
@@ -30,7 +30,7 @@ public class CoreModeMusicController : Entity
         base.Awake(scene);
         if (disable)
         {
-            foreach (CoreModeMusicController controller in Scene.Tracker.GetEntities<CoreModeMusicController>())
+            foreach (CoreModeMusicController controller in Scene.Tracker.GetEntities<CoreModeMusicController>().Cast<CoreModeMusicController>())
                 if (!controller.disable && controller.parameters.SequenceEqual(parameters))
                     controller.RemoveSelf();
             RemoveSelf();

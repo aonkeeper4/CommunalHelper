@@ -1,12 +1,11 @@
 ﻿using Celeste.Mod.CommunalHelper.Components;
-using Celeste.Mod.CommunalHelper.Entities;
 using FMOD.Studio;
 using MonoMod.Utils;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Celeste.Mod.CommunalHelper;
+namespace Celeste.Mod.CommunalHelper.Entities;
 
 [CustomEntity("CommunalHelper/ConnectedMoveBlock")]
 [Tracked]
@@ -27,9 +26,8 @@ public class ConnectedMoveBlock : ConnectedSolid
         public override void Update()
         {
             if (Parent.Scene != Scene)
-            {
                 RemoveSelf();
-            }
+
             base.Update();
         }
 
@@ -42,18 +40,16 @@ public class ConnectedMoveBlock : ConnectedSolid
 
                 float num = Parent.flash * 4f;
                 if (Parent.flash > 0f)
-                {
                     Draw.Rect(hitbox.Position + Parent.Position - new Vector2(num, num), hitbox.Width + (2f * num), hitbox.Height + (2f * num), Color.White * Parent.flash);
-                }
             }
         }
     }
 
     protected GroupableMoveBlock groupable;
 
-    protected static MTexture[,] masterEdges = new MTexture[3, 3];
-    protected static MTexture[,] masterInnerCorners = new MTexture[2, 2];
-    protected static List<MTexture> masterArrows = new();
+    private static readonly MTexture[,] masterEdges = new MTexture[3, 3];
+    private static readonly MTexture[,] masterInnerCorners = new MTexture[2, 2];
+    private static List<MTexture> masterArrows = [];
     protected MTexture xTexture;
 
     //Custom Texture support
@@ -126,6 +122,8 @@ public class ConnectedMoveBlock : ConnectedSolid
 
     private readonly bool outline;
 
+    protected readonly bool noDebris;
+
     public ConnectedMoveBlock(EntityData data, Vector2 offset)
         : this(data.Position + offset, data.Width, data.Height, data.Enum<MoveBlock.Directions>("direction"), data.Bool("fast") ? 75f : data.Float("moveSpeed", 60f))
     {
@@ -141,7 +139,7 @@ public class ConnectedMoveBlock : ConnectedSolid
             string temp;
             if (!GFX.Game.Has("objects/" + customTexturePath))
             {
-                if (GFX.Game["objects/" + customTexturePath + "/tileset"] == null)
+                if (GFX.Game["objects/" + customTexturePath + "/tileset"] is null)
                 {
                     throw new Exception($"No valid tileset found, searched @ objects/{customTexturePath}.png & objects/{customTexturePath}/tileset.png\nFor custom arrow textures, use 'objects/{customTexturePath}/arrow', 'objects/{customTexturePath}/tileset' for tiles, and 'objects/{customTexturePath}/x.png' for the breaking X sprite.");
                 }
@@ -154,7 +152,7 @@ public class ConnectedMoveBlock : ConnectedSolid
                 }
                 temp = customTexturePath + "/tileset";
                 xTexture = GFX.Game[$"objects/{customTexturePath}/x"];
-                if (xTexture == null)
+                if (xTexture is null)
                 {
                     Util.Log("No breaking texture found, defaulting to normal");
                     xTexture = GFX.Game["objects/moveBlock/x"];
@@ -174,7 +172,7 @@ public class ConnectedMoveBlock : ConnectedSolid
                 }
                 temp = customTexturePath;
                 xTexture = GFX.Game[$"objects/{temp2}/x"];
-                if (xTexture == null)
+                if (xTexture is null)
                 {
                     Util.Log("No breaking texture found, defaulting to normal");
                     xTexture = GFX.Game["objects/moveBlock/x"];
@@ -203,6 +201,8 @@ public class ConnectedMoveBlock : ConnectedSolid
         crashTime = data.Float("crashTime", 0.15f);
         regenTime = data.Float("regenTime", 3f);
         shakeOnCollision = data.Bool("shakeOnCollision", true);
+
+        noDebris = data.Bool("noDebris");
     }
 
     public ConnectedMoveBlock(Vector2 position, int width, int height, MoveBlock.Directions direction, float moveSpeed)
@@ -370,20 +370,23 @@ public class ConnectedMoveBlock : ConnectedSolid
             BreakParticles();
 
             List<MoveBlockDebris> debris = new();
-            int tWidth = (int) ((GroupBoundsMax.X - GroupBoundsMin.X) / 8);
-            int tHeight = (int) ((GroupBoundsMax.Y - GroupBoundsMin.Y) / 8);
-
-            for (int i = 0; i < tWidth; i++)
+            if (!noDebris)
             {
-                for (int j = 0; j < tHeight; j++)
+                int tWidth = (int) ((GroupBoundsMax.X - GroupBoundsMin.X) / 8);
+                int tHeight = (int) ((GroupBoundsMax.Y - GroupBoundsMin.Y) / 8);
+
+                for (int i = 0; i < tWidth; i++)
                 {
-                    if (AllGroupTiles[i, j])
+                    for (int j = 0; j < tHeight; j++)
                     {
-                        Vector2 value = new((i * 8) + 4, (j * 8) + 4);
-                        Vector2 pos = value + Position + GroupOffset;
-                        MoveBlockDebris debris2 = Engine.Pooler.Create<MoveBlockDebris>().Init(pos, GroupCenter, startPosition + GroupOffset + value);
-                        debris.Add(debris2);
-                        Scene.Add(debris2);
+                        if (AllGroupTiles[i, j])
+                        {
+                            Vector2 value = new((i * 8) + 4, (j * 8) + 4);
+                            Vector2 pos = value + Position + GroupOffset;
+                            MoveBlockDebris debris2 = Engine.Pooler.Create<MoveBlockDebris>().Init(pos, GroupCenter, startPosition + GroupOffset + value);
+                            debris.Add(debris2);
+                            Scene.Add(debris2);
+                        }
                     }
                 }
             }
@@ -443,7 +446,7 @@ public class ConnectedMoveBlock : ConnectedSolid
             }
 
             Collidable = true;
-            EventInstance instance = Audio.Play(ReformBeginSoundEffect, debris[0].Position);
+            EventInstance instance = Audio.Play(ReformBeginSoundEffect, debris.FirstOrDefault()?.Position ?? Center);
             Coroutine component;
             Coroutine routine = component = new Coroutine(SoundFollowsDebrisCenter(instance, debris));
             Add(component);
@@ -483,7 +486,7 @@ public class ConnectedMoveBlock : ConnectedSolid
 
     protected IEnumerator SoundFollowsDebrisCenter(EventInstance instance, List<MoveBlockDebris> debris)
     {
-        while (true)
+        while (true && debris.Count > 0)
         {
             instance.getPlaybackState(out PLAYBACK_STATE pLAYBACK_STATE);
             if (pLAYBACK_STATE == PLAYBACK_STATE.STOPPED)
@@ -505,7 +508,7 @@ public class ConnectedMoveBlock : ConnectedSolid
     {
         static void LoadSfxIfPresent(string sfxPath, ref string target)
         {
-            if (Audio.GetEventDescription(sfxPath) != null)
+            if (Audio.GetEventDescription(sfxPath) is not null)
             {
                 target = sfxPath;
             }
@@ -541,7 +544,7 @@ public class ConnectedMoveBlock : ConnectedSolid
 
     public override void MoveHExact(int move)
     {
-        if (noSquish != null && ((move < 0 && noSquish.X < X) || (move > 0 && noSquish.X > X)))
+        if (noSquish is not null && ((move < 0 && noSquish.X < X) || (move > 0 && noSquish.X > X)))
         {
             while (move != 0 && noSquish.CollideCheck<Solid>(noSquish.Position + (Vector2.UnitX * move)))
             {
@@ -553,7 +556,7 @@ public class ConnectedMoveBlock : ConnectedSolid
 
     public override void MoveVExact(int move)
     {
-        if (noSquish != null && move < 0 && noSquish.Y <= Y)
+        if (noSquish is not null && move < 0 && noSquish.Y <= Y)
         {
             while (move != 0 && noSquish.CollideCheck<Solid>(noSquish.Position + (Vector2.UnitY * move)))
             {
@@ -764,7 +767,7 @@ public class ConnectedMoveBlock : ConnectedSolid
     public override void Update()
     {
         base.Update();
-        if (moveSfx != null && moveSfx.Playing)
+        if (moveSfx is not null && moveSfx.Playing)
         {
             int num = (int) Math.Floor(((0f - (Calc.AngleToVector(angle, 1f) * new Vector2(-1f, 1f)).Angle() + ((float) Math.PI * 2f)) % ((float) Math.PI * 2f) / ((float) Math.PI * 2f) * 8f) + 0.5f);
             moveSfx.Param("arrow_influence", num + 1);
@@ -791,16 +794,14 @@ public class ConnectedMoveBlock : ConnectedSolid
         int arrowIndex = Calc.Clamp((int) Math.Floor(((0f - angle + ((float) Math.PI * 2f)) % ((float) Math.PI * 2f) / ((float) Math.PI * 2f) * 8f) + 0.5f), 0, 7);
         foreach (Hitbox hitbox in ArrowsList)
         {
-            Color arrowColor = groupable.Group is null
-                ? fillColor
-                : Color.Lerp(fillColor, groupable.Group.Color, Calc.SineMap(Scene.TimeActive * 3, 0, 1));
+            Color arrowColor = groupable.HighlightColor(fillColor);
 
             Vector2 vec = hitbox.Center + Position;
             Draw.Rect(vec.X - 4f, vec.Y - 4f, 8f, 8f, arrowColor);
 
             if (groupable.State != GroupableMoveBlock.MovementState.Breaking)
             {
-                if (arrows == null)
+                if (arrows is null)
                     masterArrows[arrowIndex].DrawCentered(vec);
                 else
                     arrows[arrowIndex].DrawCentered(vec);

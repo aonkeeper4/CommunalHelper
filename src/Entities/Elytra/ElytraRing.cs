@@ -122,13 +122,15 @@ public abstract class ElytraRing : Entity
     /// </summary>
     /// <param name="player">A reference to the player.</param>
     /// <param name="sign">The sign of the traversal. +1 for crossing the ring in its direction, -1 for crossing it in the opposite direction.</param>
+    // EXPECTED TO EXIST BY EXTERNAL MOD
+    // https://github.com/CommunalHelper/CommunalHelper/issues/56#issuecomment-2336465719
     public virtual void OnPlayerTraversal(Player player, int sign, bool shake = true)
     {
         timer = Delay;
         travelLerp = 1.0f;
 
         Level level = Scene as Level;
-        
+
         if (shake)
         {
             level.Shake(0.1f);
@@ -150,7 +152,7 @@ public abstract class ElytraRing : Entity
     {
         timer = Calc.Approach(timer, 0.0f, Engine.DeltaTime);
 
-        Matrix m = Matrix.CreateRotationY(rotation + 0.25f + (float)Math.Sin(Scene.TimeActive * 3f) * 0.1f) * orientation;
+        Matrix m = Matrix.CreateRotationY(rotation + 0.25f + (float) Math.Sin(Scene.TimeActive * 3f) * 0.1f) * orientation;
         front.Matrix = m;
         back.Matrix = Matrix.CreateRotationX(MathHelper.Pi) * m;
 

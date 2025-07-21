@@ -19,6 +19,8 @@ public class CustomSummitGem : SummitGem
 {
     private static readonly Type t_BgFlash = typeof(SummitGem).GetNestedType("BgFlash", BindingFlags.NonPublic);
 
+    // USED BY EXTERNAL MOD
+    // https://github.com/CommunalHelper/CommunalHelper/issues/56#issuecomment-980799864
     public static new readonly Color[] GemColors;
 
     public string CustomGemSID;
@@ -60,7 +62,7 @@ public class CustomSummitGem : SummitGem
         Wiggler scaleWiggler = Wiggler.Create(0.5f, 4f, f => sprite.Scale = Vector2.One * (1f + (f * 0.3f)));
         Add(scaleWiggler);
 
-        if (CommunalHelperModule.SaveData.SummitGems != null && CommunalHelperModule.SaveData.SummitGems.Contains(CustomGemSID))
+        if (CommunalHelperModule.SaveData.SummitGems is not null && CommunalHelperModule.SaveData.SummitGems.Contains(CustomGemSID))
         {
             sprite.Color = Color.White * 0.5f;
         }
@@ -74,7 +76,7 @@ public class CustomSummitGem : SummitGem
         baseData.Set("sprite", sprite);
     }
 
-    private IEnumerator SmashRoutine(Player player, Level level)
+    new private IEnumerator SmashRoutine(Player player, Level level)
     {
         Visible = false;
         Collidable = false;

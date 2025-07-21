@@ -10,7 +10,7 @@ local cassetteIndexOptions = {
     ["2 - Bright Sun"] = 2,
     ["3 - Malachite"] = 3
 }
-local colors = communalHelper.cassetteBlockHexColors
+local cassetteIndexColors = communalHelper.cassetteBlockHexColors
 
 local aeroBlockCharged = {}
 
@@ -55,20 +55,22 @@ aeroBlockCharged.placements = {
         }
     }
 }
-for i = 1, 4 do
+for i = 0, 3 do
     table.insert(aeroBlockCharged.placements, {
-        name = string.format("aero_block_charged_%s", i - 1),
+        name = string.format("aero_block_charged_%s", i),
         data = {
             width = 16,
             height = 16,
             buttonSequence = "left -> right+top",
             hover = true,
             loop = false,
-            activeColor = colors[i],
+            activeColor = cassetteIndexColors[i + 1],
             inactiveColor = "FF6347",
             easing = "CubeIn",
-            SpirialisBug = false,
-            cassetteIndex = i - 1,
+            -- SpirialisBug = false,
+            SpirialisBugV2 = false,
+            wallbounceLeniency = true,
+            cassetteIndex = i,
             moveOnCassetteTick = true,
         }
     })
@@ -96,10 +98,8 @@ function aeroBlockCharged.sprite(room, entity)
     table.insert(sprites, rectangle:getDrawableSprite())
 
     if entity.cassetteIndex and entity.cassetteIndex ~= -1 then
-        local cassetteIndicatorColor = entity.activeColor ~= "" and communalHelper.hexToColor(entity.activeColor) or
-            communalHelper.cassetteBlockColors[entity.cassetteIndex + 1]
-        local cassetteIndicator = drawableRectangle.fromRectangle("fill", x + 4, y + 4, width - 8, height - 8,
-            cassetteIndicatorColor)
+        local cassetteIndicatorColor = entity.activeColor ~= "" and communalHelper.hexToColor(entity.activeColor) or cassetteIndexColors[entity.cassetteIndex + 1]
+        local cassetteIndicator = drawableRectangle.fromRectangle("fill", x + 4, y + 4, width - 8, height - 8, cassetteIndicatorColor)
         table.insert(sprites, cassetteIndicator:getDrawableSprite())
     end
 

@@ -125,7 +125,7 @@ public static class DreamTunnelDash
             State_DreamDashEqual);
 
         IL.Celeste.Level.EnforceBounds += Level_EnforceBounds;
-        On.Celeste.Level.Reload += Level_Reload;
+        Everest.Events.Player.OnDie += OnDie;
         On.Celeste.LevelLoader.StartLevel += LevelLoader_StartLevel;
         On.Celeste.Player.OnBoundsH += Player_OnBoundsH;
         On.Celeste.Player.OnBoundsV += Player_OnBoundsV;
@@ -158,7 +158,7 @@ public static class DreamTunnelDash
         hook_Player_orig_UpdateSprite.Dispose();
 
         IL.Celeste.Level.EnforceBounds -= Level_EnforceBounds;
-        On.Celeste.Level.Reload -= Level_Reload;
+        Everest.Events.Player.OnDie -= OnDie;
         On.Celeste.LevelLoader.StartLevel -= LevelLoader_StartLevel;
         On.Celeste.Player.OnBoundsH -= Player_OnBoundsH;
         On.Celeste.Player.OnBoundsV -= Player_OnBoundsV;
@@ -585,11 +585,10 @@ public static class DreamTunnelDash
         }
     }
 
-    private static void Level_Reload(On.Celeste.Level.orig_Reload orig, Level self)
+    private static void OnDie(Player player)
     {
         DreamTunnelDashCount = 0;
         dreamTunnelDashAttacking = false;
-        orig(self);
     }
 
     private static void LevelLoader_StartLevel(On.Celeste.LevelLoader.orig_StartLevel orig, LevelLoader self)

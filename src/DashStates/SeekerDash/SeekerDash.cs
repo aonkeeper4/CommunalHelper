@@ -67,7 +67,7 @@ public static class SeekerDash
 
         On.Celeste.AngryOshiro.OnPlayer += AngryOshiro_OnPlayer;
 
-        On.Celeste.Level.Reload += Level_Reload;
+        Everest.Events.Player.OnDie += OnDie;
         On.Celeste.LevelLoader.StartLevel += LevelLoader_StartLevel;
     }
 
@@ -96,6 +96,9 @@ public static class SeekerDash
         On.Celeste.Seeker.OnAttackPlayer -= Seeker_OnAttackPlayer;
 
         On.Celeste.AngryOshiro.OnPlayer -= AngryOshiro_OnPlayer;
+
+        Everest.Events.Player.OnDie -= OnDie;
+        On.Celeste.LevelLoader.StartLevel -= LevelLoader_StartLevel;
     }
 
     #region Hooks
@@ -435,10 +438,9 @@ public static class SeekerDash
         orig(self, player);
     }
 
-    private static void Level_Reload(On.Celeste.Level.orig_Reload orig, Level self)
+    private static void OnDie(Player player)
     {
         hasSeekerDash = seekerDashAttacking = seekerDashLaunched = launchPossible = false;
-        orig(self);
     }
 
     private static void LevelLoader_StartLevel(On.Celeste.LevelLoader.orig_StartLevel orig, LevelLoader self)

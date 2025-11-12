@@ -10,9 +10,9 @@ namespace Celeste.Mod.CommunalHelper.Entities;
 internal class DreamSpriteRenderer : Entity
 {
     private readonly int rendererDepth;
-    private readonly List<DreamSprite> sprites = new();
+    private readonly List<DreamSprite> sprites = [];
 
-    private static readonly AlphaTestEffect alphaTestEffect = new(Engine.Graphics.GraphicsDevice)
+    private static readonly AlphaTestEffect AlphaTestEffect = new(Engine.Graphics.GraphicsDevice)
     {
         VertexColorEnabled = true,
         DiffuseColor = Color.White.ToVector3(),
@@ -22,7 +22,7 @@ internal class DreamSpriteRenderer : Entity
         View = Matrix.Identity
     };
 
-    private static readonly DepthStencilState drawToStencilState = new()
+    private static readonly DepthStencilState DrawToStencilState = new()
     {
         StencilEnable = true,
         StencilFunction = CompareFunction.Always,
@@ -30,7 +30,7 @@ internal class DreamSpriteRenderer : Entity
         ReferenceStencil = 1,
         DepthBufferEnable = false,
     };
-    private static readonly DepthStencilState drawWithStencilState = new()
+    private static readonly DepthStencilState DrawWithStencilState = new()
     {
         StencilEnable = true,
         StencilFunction = CompareFunction.LessEqual,
@@ -59,7 +59,7 @@ internal class DreamSpriteRenderer : Entity
         animTimer += 6f * Engine.DeltaTime;
     }
 
-    public void BeforeRender()
+    private void BeforeRender()
     {
         // cannot store buffer as it may be deep-cloned by state-saving
         CommunalHelperGFX.QueryDreamSpriteBuffers(rendererDepth, out var buffer);
@@ -74,11 +74,9 @@ internal class DreamSpriteRenderer : Entity
             Vector2 spritePosition = sprite.Position;
             Vector2 spriteScale = sprite.Scale;
             float spriteRotation = sprite.Rotation;
-            if (sprite.InvertedGravityHandler is DreamSprite.SpriteInvertedGravityHandler handler &&
+            if (sprite.InvertedGravityHandler is { } handler &&
                 ((sprite.Entity as Actor)?.GetGravity() ?? GravityType.Normal) == GravityType.Inverted)
-            {
                 handler(ref spritePosition, ref spriteScale, ref spriteRotation);
-            }
 
             Engine.Graphics.GraphicsDevice.Clear(ClearOptions.Stencil, Color.Transparent, 0f, 0);
 
@@ -92,11 +90,16 @@ internal class DreamSpriteRenderer : Entity
 
             if (!boundsOnScreen.Intersects(buffer.Bounds) || !sprite.Visible)
                 continue;
+            
+            (Color? controllerActiveBackColor, Color? controllerDisabledBackColor, Color? controllerActiveLineColor, Color? controllerDisabledLineColor, _)
+                = PandorasBox.GetVisualSettingsFor(sprite.Marker);
 
             // outline
             Draw.SpriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, DepthStencilState.Default, RasterizerState.CullNone, null);
 
-            Color outlineColor = (sprite.Enabled ? DreamSprite.EnabledLineColor : DreamSprite.DisabledLineColor).Mult(sprite.Color);
+            Color outlineColor = (sprite.Enabled
+                ? controllerActiveLineColor ?? DreamSprite.ActiveLineColor
+                : controllerDisabledLineColor ?? DreamSprite.DisabledLineColor).Mult(sprite.Color);
             sprite.Texture.Draw(posOnScreen + Vector2.UnitX, sprite.Origin, outlineColor, spriteScale, spriteRotation, sprite.Effects);
             sprite.Texture.Draw(posOnScreen - Vector2.UnitX, sprite.Origin, outlineColor, spriteScale, spriteRotation, sprite.Effects);
             sprite.Texture.Draw(posOnScreen + Vector2.UnitY, sprite.Origin, outlineColor, spriteScale, spriteRotation, sprite.Effects);
@@ -105,23 +108,28 @@ internal class DreamSpriteRenderer : Entity
             Draw.SpriteBatch.End();
 
             // back
-            alphaTestEffect.Projection = Matrix.CreateOrthographicOffCenter(0, CommunalHelperGFX.GameplayBufferWidth, CommunalHelperGFX.GameplayBufferHeight, 0, 0, 1);
-            Draw.SpriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, drawToStencilState, RasterizerState.CullNone, alphaTestEffect);
+            AlphaTestEffect.Projection = Matrix.CreateOrthographicOffCenter(0, CommunalHelperGFX.GameplayBufferWidth, CommunalHelperGFX.GameplayBufferHeight, 0, 0, 1);
+            Draw.SpriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, DrawToStencilState, RasterizerState.CullNone, AlphaTestEffect);
 
-            Color backColor = (sprite.Enabled ? DreamSprite.EnabledBackColor : DreamSprite.DisabledBackColor).Mult(sprite.Color);
+            Color backColor = (sprite.Enabled
+                ? controllerActiveBackColor ?? DreamSprite.ActiveBackColor
+                : controllerDisabledBackColor ?? DreamSprite.DisabledBackColor).Mult(sprite.Color);
             sprite.Texture.Draw(posOnScreen, sprite.Origin, Color.Lerp(backColor, Color.White, sprite.Flash), spriteScale, spriteRotation, sprite.Effects);
 
             Draw.SpriteBatch.End();
 
             // particles
-            Draw.SpriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, drawWithStencilState, RasterizerState.CullNone, null);
+            if (sprite.Particles is null)
+                continue;
+            
+            Draw.SpriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, DrawWithStencilState, RasterizerState.CullNone, null);
 
             for (int i = 0; i < sprite.Particles.Length; i++)
             {
                 int layer = sprite.Particles[i].Layer;
 
                 Vector2 particlePos = sprite.Particles[i].Position;
-                particlePos -= camera.Position * (0.7f - (0.25f * layer)); // should be consistent with dream blocks
+                particlePos -= camera.Position * (0.7f - 0.25f * layer); // should be consistent with dream blocks
                 while (particlePos.X < boundsOnScreen.Left) particlePos.X += boundsOnScreen.Width;
                 while (particlePos.X > boundsOnScreen.Right) particlePos.X -= boundsOnScreen.Width;
                 while (particlePos.Y < boundsOnScreen.Top) particlePos.Y += boundsOnScreen.Height;
@@ -131,23 +139,22 @@ internal class DreamSpriteRenderer : Entity
                 switch (layer)
                 {
                     case 0:
-                    {
-                        int num2 = (int) (((sprite.Particles[i].TimeOffset * 4f) + animTimer) % 4f);
-                        mTexture = particleTextures[3 - num2];
+                        int num = (int) ((sprite.Particles[i].TimeOffset * 4f + animTimer) % 4f);
+                        mTexture = particleTextures[3 - num];
                         break;
-                    }
+                    
                     case 1:
-                    {
-                        int num = (int) (((sprite.Particles[i].TimeOffset * 2f) + animTimer) % 2f);
-                        mTexture = particleTextures[1 + num];
+                        int num2 = (int) ((sprite.Particles[i].TimeOffset * 2f + animTimer) % 2f);
+                        mTexture = particleTextures[1 + num2];
                         break;
-                    }
+                    
                     default:
                         mTexture = particleTextures[2];
                         break;
                 }
 
-                mTexture.DrawCentered(particlePos, (sprite.Enabled ? sprite.Particles[i].EnabledColor : sprite.Particles[i].DisabledColor).Mult(sprite.Color));
+                Color particleColor = (sprite.Enabled ? sprite.Particles[i].EnabledColor : sprite.Particles[i].DisabledColor).Mult(sprite.Color);
+                mTexture.DrawCentered(particlePos, particleColor);
             }
 
             Draw.SpriteBatch.End();
@@ -156,7 +163,7 @@ internal class DreamSpriteRenderer : Entity
 
     public override void Render()
     {
-        CommunalHelperGFX.QueryDreamSpriteBuffers(rendererDepth, out var buffer);
+        CommunalHelperGFX.QueryDreamSpriteBuffers(rendererDepth, out RenderTarget2D buffer);
         Draw.SpriteBatch.Draw(buffer, SceneAs<Level>().Camera.Position, Color.White);
     }
 
@@ -173,14 +180,13 @@ internal class DreamSpriteRenderer : Entity
     public static DreamSpriteRenderer GetDreamSpriteRenderer(Scene scene, int depth)
     {
         if (scene.Tracker.GetEntities<DreamSpriteRenderer>()
-                         .Concat(scene.Entities.ToAdd)
-                         .FirstOrDefault(r => r is DreamSpriteRenderer && r.Depth == depth)
-                         is not DreamSpriteRenderer renderer)
-        {
-            scene.Add(renderer = new(depth));
-            Util.Log(LogLevel.Info, $"creating new DreamSpriteRenderer at depth {depth}.");
-        }
-
+                 .Concat(scene.Entities.ToAdd)
+                 .FirstOrDefault(r => r is DreamSpriteRenderer && r.Depth == depth)
+            is DreamSpriteRenderer renderer)
+            return renderer;
+        
+        scene.Add(renderer = new DreamSpriteRenderer(depth));
+        Util.Log(LogLevel.Info, $"creating new DreamSpriteRenderer at depth {depth}.");
         return renderer;
     }
 }

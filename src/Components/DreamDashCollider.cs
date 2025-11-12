@@ -3,6 +3,7 @@ using Mono.Cecil;
 using Mono.Cecil.Cil;
 using MonoMod.Cil;
 using MonoMod.Utils;
+using System.Linq;
 
 namespace Celeste.Mod.CommunalHelper.Components;
 
@@ -11,37 +12,33 @@ internal class DreamDashCollider : Component
 {
     // Used as a dream block dummy, but which stores a DreamDashCollider property.
     // The reason for this is I didn't want to store a DreamDashCollider inside DreamBlockDummy.
-    internal sealed class ColliderDummy : DreamBlockDummy
+    private sealed class ColliderDummy(Entity entity, DreamDashCollider dreamDashCollider) : DreamBlockDummy(entity)
     {
-        public DreamDashCollider DreamDashCollider { get; }
-        public ColliderDummy(Entity entity, DreamDashCollider collider)
-            : base(entity)
-        {
-            DreamDashCollider = collider;
-        }
+        public DreamDashCollider DreamDashCollider => dreamDashCollider;
     }
 
-    public static readonly Color ActiveColor = Color.Teal;
-    public static readonly Color InactiveColor = Calc.HexToColor("044f63"); // darker teal
+    private static readonly Color ActiveColor = Color.Teal;
+    private static readonly Color InactiveColor = Calc.HexToColor("044f63"); // darker teal
 
-    public Collider Collider;
-    public ColliderDummy Dummy;
+    public readonly Collider Collider;
+    private ColliderDummy dummy;
 
-    public Action<Player> OnEnter, OnExit;
+    private readonly Action<Player> onEnter, onExit;
 
     public DreamDashCollider(Collider collider, Action<Player> onEnter = null, Action<Player> onExit = null)
         : base(active: true, visible: false)
     {
         Collider = collider;
-        Dummy = new(Entity, this);
-        OnEnter = onEnter;
-        OnExit = onExit;
+        
+        this.onEnter = onEnter;
+        this.onExit = onExit;
     }
 
-    public override void Added(Entity entity)
+    public override void EntityAdded(Scene scene)
     {
-        base.Added(entity);
-        Dummy.Entity = entity;
+        base.EntityAdded(scene);
+        
+        Scene.Add(dummy = new ColliderDummy(Entity, this));
     }
 
     /// <summary>
@@ -50,43 +47,52 @@ internal class DreamDashCollider : Component
     /// <param name="player">The player instance.</param>
     private bool Check(Player player)
     {
-        if (Active && Collider is not null && Entity is not null &&
-            player.GetData().Data.TryGetValue(Player_canEnterDreamDashCollider, out object canEnter) && canEnter.Equals(true))
-        {
+        if (!Active
+            || Collider is null
+            || Entity is null
+            || !player.GetData().Data.TryGetValue(Player_canEnterDreamDashCollider, out object canEnter)
+            || !canEnter.Equals(true))
+            return false;
+        
+        Collider collider = Entity.Collider;
 
-            Collider collider = Entity.Collider;
+        Entity.Collider = Collider;
+        bool check = player.CollideCheck(Entity);
+        Entity.Collider = collider;
 
-            Entity.Collider = Collider;
-            bool check = player.CollideCheck(Entity);
-            Entity.Collider = collider;
-
-            return check;
-        }
-        return false;
+        return check;
     }
 
     public override void Update()
     {
         base.Update();
-        if (Util.TryGetPlayer(out Player player) && Check(player) && player.DashAttacking && player.Speed != Vector2.Zero && player.StateMachine.State != Player.StDreamDash)
-            player.StateMachine.State = Player.StDreamDash;
+
+        if (!Util.TryGetPlayer(out Player player)
+            || !Check(player)
+            || !player.DashAttacking
+            || player.Speed == Vector2.Zero
+            || player.StateMachine.State == Player.StDreamDash)
+            return;
+        
+        player.dreamBlock = dummy;
+        player.StateMachine.State = Player.StDreamDash;
     }
 
     public override void DebugRender(Camera camera)
     {
-        if (Collider is not null)
-        {
-            Collider collider = Entity.Collider;
+        if (Collider is null)
+            return;
+        
+        Collider collider = Entity.Collider;
 
-            Entity.Collider = Collider;
-            Collider.Render(camera, Active ? ActiveColor : InactiveColor);
-            Entity.Collider = collider;
-        }
+        Entity.Collider = Collider;
+        Collider.Render(camera, Active ? ActiveColor : InactiveColor);
+        Entity.Collider = collider;
     }
 
     #region Hooks
 
-    public static readonly string Player_canEnterDreamDashCollider = "communalHelperCanEnterDreamDashCollider";
+    private const string Player_canEnterDreamDashCollider = "communalHelperCanEnterDreamDashCollider";
 
     internal static void Load()
     {
@@ -105,46 +111,47 @@ internal class DreamDashCollider : Component
     private static void Player_DashBegin(On.Celeste.Player.orig_DashBegin orig, Player self)
     {
         orig(self);
+        
         self.GetData().Set(Player_canEnterDreamDashCollider, true);
     }
 
     private static void Player_DreamDashEnd(On.Celeste.Player.orig_DreamDashEnd orig, Player self)
     {
         DynamicData playerData = self.GetData();
-        if (playerData.Get<DreamBlock>("dreamBlock") is DreamBlockDummy dummy)
+        
+        if (self.dreamBlock is DreamBlockDummy dummy)
             foreach (DreamDashCollider collider in dummy.Entity.Components.GetAll<DreamDashCollider>())
             {
                 playerData.Set(Player_canEnterDreamDashCollider, false);
-                collider.OnExit?.Invoke(self);
+                collider.onExit?.Invoke(self);
             }
+        
         orig(self);
     }
 
     private static void Player_DreamDashUpdate(ILContext il)
     {
         ILCursor cursor = new(il);
-        if (cursor.TryGotoNext(MoveType.After, instr => instr.MatchCall(out MethodReference m) && m.Name == "CollideFirst"))
-        {
-            cursor.Emit(OpCodes.Ldarg_0);
-            cursor.EmitDelegate<Func<DreamBlock, Player, DreamBlock>>((dreamBlock, self) =>
-            {
-                foreach (DreamDashCollider collider in self.Scene.Tracker.GetComponents<DreamDashCollider>())
-                    if (collider.Check(self))
-                        return collider.Dummy;
-                return dreamBlock;
-            });
-        }
 
-        cursor.GotoNext(instr => instr.MatchStfld<Player>("dreamBlock"));
+        if (!cursor.TryGotoNext(MoveType.After, instr => instr.MatchCall<Entity>("CollideFirst")))
+            return;
+        
+        cursor.Emit(OpCodes.Ldarg_0);
+        cursor.EmitDelegate<Func<DreamBlock, Player, DreamBlock>>((dreamBlock, self)
+            => self.Scene.Tracker.GetComponents<DreamDashCollider>()
+                                 .Cast<DreamDashCollider>()
+                                 .FirstOrDefault(collider => collider.Check(self))?
+                                 .dummy ?? dreamBlock);
+
+        if (!cursor.TryGotoNext(instr => instr.MatchStfld<Player>("dreamBlock")))
+            return;
 
         cursor.Emit(OpCodes.Ldarg_0);
         cursor.EmitDelegate<Func<DreamBlock, Player, DreamBlock>>((dreamBlock, self) =>
-        {
-            DynamicData data = DynamicData.For(self);
-
-            DreamBlock oldDreamBlock = data.Get<DreamBlock>("dreamBlock");
+        { 
+            DreamBlock oldDreamBlock = self.dreamBlock;
             if (dreamBlock != oldDreamBlock && dreamBlock is ColliderDummy dummy)
-                dummy.DreamDashCollider.OnEnter?.Invoke(self);
+                dummy.DreamDashCollider.onEnter?.Invoke(self);
 
             return dreamBlock;
         });

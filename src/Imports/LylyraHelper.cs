@@ -35,7 +35,7 @@ public static class LylyraHelper
     public static void Load()
     {
         Func<Entity, DynamicData, EntityData> GetDreamEntityData = (Entity data, DynamicData slicer) => {
-            return (data as CustomDreamBlock).creatingData;
+            return (data as CustomDreamBlock).CreationData;
         };
 
         //audio paths have been left blank for the moment

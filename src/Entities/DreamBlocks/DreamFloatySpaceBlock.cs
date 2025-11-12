@@ -32,7 +32,7 @@ public class DreamFloatySpaceBlock : ConnectedDreamBlock
         {
             foreach (ConnectedDreamBlock block in Group)
             {
-                if (block is not DreamFloatySpaceBlock floatyBlock || !floatyBlock.awake)
+                if (block is not DreamFloatySpaceBlock floatyBlock || !floatyBlock.IsAwake)
                 {
                     return;
                 }
@@ -40,7 +40,7 @@ public class DreamFloatySpaceBlock : ConnectedDreamBlock
             MoveToTarget();
             return;
         }
-        (master as DreamFloatySpaceBlock)?.TryToInitPosition();
+        (Master as DreamFloatySpaceBlock)?.TryToInitPosition();
     }
 
     private void MoveToTarget()

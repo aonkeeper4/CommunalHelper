@@ -1,4 +1,5 @@
 ﻿using FMOD.Studio;
+using System.Collections.Generic;
 
 namespace Celeste.Mod.CommunalHelper.Entities;
 
@@ -29,7 +30,11 @@ public class DreamSwapBlock : CustomDreamBlock
         {
             float scale = 0.5f * (0.5f + (((float) Math.Sin(timer) + 1f) * 0.25f));
             scale = Calc.LerpClamp(scale, 1, block.ColorLerp);
-            Util.DrawBlockStyle(SceneAs<Level>().Camera, new Vector2(block.moveRect.X, block.moveRect.Y), block.moveRect.Width, block.moveRect.Height, block.nineSliceTarget, null, ActiveLineColor * scale);
+
+            (_, _, Color? controllerActiveLineColor, _, _) = Imports.PandorasBox.GetVisualSettingsFor(this);
+            Color activeLineColor = controllerActiveLineColor ?? DreamBlock.activeLineColor;
+            
+            Util.DrawBlockStyle(SceneAs<Level>().Camera, new Vector2(block.moveRect.X, block.moveRect.Y), block.moveRect.Width, block.moveRect.Height, block.nineSliceTarget, null, activeLineColor * scale);
         }
     }
 
@@ -281,10 +286,10 @@ public class DreamSwapBlock : CustomDreamBlock
     {
         base.Render();
         if (noReturn)
-            cross.DrawCentered(Center + baseData.Get<Vector2>("shake"));
+            cross.DrawCentered(Center + shake);
     }
 
-    public override void SetupCustomParticles(float canvasWidth, float canvasHeight)
+    protected override void SetupCustomParticles(float canvasWidth, float canvasHeight)
     {
         base.SetupCustomParticles(canvasWidth, canvasHeight);
         if (PlayerHasDreamDash)

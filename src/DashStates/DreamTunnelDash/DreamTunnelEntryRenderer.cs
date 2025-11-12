@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 
 namespace Celeste.Mod.CommunalHelper.Entities;
 
@@ -11,7 +12,7 @@ public class DreamTunnelEntryRenderer : Entity
 {
     private class CustomDepthRenderer : Entity
     {
-        public readonly List<DreamTunnelEntry> list = [];
+        public readonly List<DreamTunnelEntry> List = [];
 
         public CustomDepthRenderer(int depth)
         {
@@ -21,28 +22,26 @@ public class DreamTunnelEntryRenderer : Entity
 
         public override void Render()
         {
-            foreach (DreamTunnelEntry e in list)
+            foreach (DreamTunnelEntry e in List.Where(e => e.Visible))
             {
-                if (e.Visible)
-                {
-                    Vector2 shake = e.Shake;
+                Vector2 shake = e.Shake;
 
-                    Vector2 start = shake + e.Start;
-                    Vector2 end = shake + e.End;
+                Vector2 start = shake + e.Start;
+                Vector2 end = shake + e.End;
 
-                    Draw.Rect(shake.X + e.X, shake.Y + e.Y, e.Width, e.Height, e.PlayerHasDreamDash ? CustomDreamBlock.ActiveBackColor : CustomDreamBlock.DisabledBackColor * e.Alpha);
-                    if (e.Whitefill > 0f)
-                        Draw.Rect(e.X + shake.X, e.Y + shake.Y, e.Width, e.Height * e.WhiteHeight, Color.White * e.Whitefill * e.Alpha);
-                    e.WobbleLine(start, end, 0f, false, true);
-                }
+                (Color? controllerActiveBackColor, Color? controllerDisabledBackColor, _, _, _) = Imports.PandorasBox.GetVisualSettingsFor(e);
+                Color backColor = e.PlayerHasDreamDash
+                    ? controllerActiveBackColor ?? DreamBlock.activeBackColor
+                    : controllerDisabledBackColor ?? DreamBlock.disabledBackColor;
 
+                Draw.Rect(shake.X + e.X, shake.Y + e.Y, e.Width, e.Height, backColor * e.Alpha);
+                if (e.WhiteFill > 0f)
+                    Draw.Rect(e.X + shake.X, e.Y + shake.Y, e.Width, e.Height * e.WhiteHeight, Color.White * e.WhiteFill * e.Alpha);
+                e.WobbleLine(start, end, 0f, false, true);
             }
 
-            foreach (DreamTunnelEntry e in list)
-            {
-                if (e.Visible)
-                    e.WobbleLine(e.Shake + e.Start, e.Shake + e.End, 0f, true, false);
-            }
+            foreach (DreamTunnelEntry e in List.Where(e => e.Visible))
+                e.WobbleLine(e.Shake + e.Start, e.Shake + e.End, 0f, true, false);
         }
     }
 
@@ -63,21 +62,20 @@ public class DreamTunnelEntryRenderer : Entity
         }
 
         // Add entity
-        renderer.list.Add(entity);
+        renderer.List.Add(entity);
     }
 
     public void Untrack(DreamTunnelEntry entity, int depth)
     {
-        if (renderers.TryGetValue(depth, out CustomDepthRenderer renderer))
-        {
-            renderer.list.Remove(entity);
+        if (!renderers.TryGetValue(depth, out CustomDepthRenderer renderer))
+            return;
+        renderer.List.Remove(entity);
 
-            if (renderer.list.Count == 0)
-            {
-                // No entity with this renderer's depth exist, get rid of it.
-                renderers.Remove(depth);
-                renderer.RemoveSelf();
-            }
+        if (renderer.List.Count == 0)
+        {
+            // No entity with this renderer's depth exist, get rid of it.
+            renderers.Remove(depth);
+            renderer.RemoveSelf();
         }
     }
 }

@@ -59,7 +59,7 @@ public class DreamTunnelEntry : AbstractPanel
     private Vector2 shake;
 #pragma warning restore CS0649
 
-    public float Whitefill;
+    public float WhiteFill;
     public float WhiteHeight;
 
     private float animTimer;
@@ -72,7 +72,7 @@ public class DreamTunnelEntry : AbstractPanel
     private DreamParticle[] particles;
     private readonly MTexture[] particleTextures;
 
-    private readonly int originalDepth = Depths.FakeWalls;
+    private readonly int originalDepth;
 
     private DreamBlockDummy dummy;
 
@@ -85,10 +85,10 @@ public class DreamTunnelEntry : AbstractPanel
         surfaceSoundIndex = SurfaceIndex.DreamBlockInactive;
 
         particleTextures = [
-            GFX.Game["objects/dreamblock/particles"].GetSubtexture(14, 0, 7, 7, null),
-            GFX.Game["objects/dreamblock/particles"].GetSubtexture(7, 0, 7, 7, null),
-            GFX.Game["objects/dreamblock/particles"].GetSubtexture(0, 0, 7, 7, null),
-            GFX.Game["objects/dreamblock/particles"].GetSubtexture(7, 0, 7, 7, null)
+            GFX.Game["objects/dreamblock/particles"].GetSubtexture(14, 0, 7, 7),
+            GFX.Game["objects/dreamblock/particles"].GetSubtexture(7, 0, 7, 7),
+            GFX.Game["objects/dreamblock/particles"].GetSubtexture(0, 0, 7, 7),
+            GFX.Game["objects/dreamblock/particles"].GetSubtexture(7, 0, 7, 7)
         ];
     }
 
@@ -104,18 +104,24 @@ public class DreamTunnelEntry : AbstractPanel
                     if (dir.Y > 0 && TryCollidePlayer(player, Vector2.UnitY, player.DashDir))
                         return DashCollisionResults.Ignore;
                     break;
+                
                 case Spikes.Directions.Down:
                     if (dir.Y < 0 && TryCollidePlayer(player, -Vector2.UnitY, player.DashDir))
                         return DashCollisionResults.Ignore;
                     break;
+                
                 case Spikes.Directions.Left:
                     if (dir.X > 0 && TryCollidePlayer(player, Vector2.UnitX, player.DashDir))
                         return DashCollisionResults.Ignore;
                     break;
+                
                 case Spikes.Directions.Right:
                     if (dir.X < 0 && TryCollidePlayer(player, -Vector2.UnitX, player.DashDir))
                         return DashCollisionResults.Ignore;
                     break;
+                
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
         }
         else
@@ -128,14 +134,19 @@ public class DreamTunnelEntry : AbstractPanel
                         player.Right < Right + 4 || !Scene.CollideCheck<Solid>(CenterRight + Vector2.UnitX))
                         return DashCollisionResults.NormalCollision;
                     break;
+                
                 case Spikes.Directions.Left when dir.X > 0:
                 case Spikes.Directions.Right when dir.X < 0:
-                    if (player.Top > Top - 4 || (!Scene.CollideCheck<Solid>(TopCenter - Vector2.UnitY) &&
-                        player.Bottom < Bottom + 4) || !Scene.CollideCheck<Solid>(BottomCenter + Vector2.UnitY))
+                    if (player.Top > Top - 4 || !Scene.CollideCheck<Solid>(TopCenter - Vector2.UnitY) &&
+                        player.Bottom < Bottom + 4 || !Scene.CollideCheck<Solid>(BottomCenter + Vector2.UnitY))
                         return DashCollisionResults.NormalCollision;
                     break;
+                
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
         }
+        
         return base.OnDashCollide(orig, player, dir);
     }
 
@@ -146,70 +157,58 @@ public class DreamTunnelEntry : AbstractPanel
             return false;
 
         bool changeState = true;
-        if (Orientation is Spikes.Directions.Left or Spikes.Directions.Right)
+        switch (Orientation)
         {
-            if (player.Top < Top)
-            {
+            case Spikes.Directions.Left or Spikes.Directions.Right when player.Top < Top:
                 if (Top - player.Top <= 4)
                     player.Top = Top;
                 else if (dir.Y == 0 && TryCorrectPlayerPosition(player, new Vector2(at.X, Top)))
                     changeState = false;
                 else if (dir.Y != 0 && !Scene.CollideCheck<Solid>(TopCenter - Vector2.UnitY))
-                {
-                    ; // Messy
-                }
+                { }
                 else
                     return false;
-            }
-            else if (player.Bottom > Bottom)
-            {
+                break;
+            
+            case Spikes.Directions.Left or Spikes.Directions.Right when player.Bottom > Bottom:
                 if (player.Bottom - Bottom <= 4)
                     player.Bottom = Bottom;
                 else if (dir.Y == 0 && TryCorrectPlayerPosition(player, new Vector2(at.X, Bottom + player.Height)))
                     changeState = false;
                 else if (dir.Y != 0 && !Scene.CollideCheck<Solid>(BottomCenter + Vector2.UnitY))
-                {
-                    ; // Messy
-                }
+                { }
                 else
                     return false;
-            }
-        }
-        else if (Orientation is Spikes.Directions.Up or Spikes.Directions.Down)
-        {
-            if (player.Left < Left)
-            {
+                break;
+            
+            case Spikes.Directions.Up or Spikes.Directions.Down when player.Left < Left:
                 // Sorry for my jank
-                if (!(player.OnGround() && !player.CollideCheck<Solid>(new Vector2(Left - (player.Width / 2), at.Y))))
+                if (!(player.OnGround() && !player.CollideCheck<Solid>(new Vector2(Left - player.Width / 2, at.Y))))
                 {
                     if (Left - player.Left <= 4)
                         player.Left = Left;
-                    else if (dir.X == 0 && TryCorrectPlayerPosition(player, new Vector2(Left - (player.Width / 2), at.Y)))
+                    else if (dir.X == 0 && TryCorrectPlayerPosition(player, new Vector2(Left - player.Width / 2, at.Y)))
                         changeState = false;
                     else if (dir.X != 0 && !Scene.CollideCheck<Solid>(CenterLeft - Vector2.UnitX))
-                    {
-                        ; // Messy
-                    }
+                    { }
                     else
                         return false;
                 }
-            }
-            else if (player.Right > Right)
-            {
-                if (!(player.OnGround() && !player.CollideCheck<Solid>(new Vector2(Left - (player.Width / 2), at.Y))))
+                break;
+                
+            case Spikes.Directions.Up or Spikes.Directions.Down when player.Right > Right:
+                if (!(player.OnGround() && !player.CollideCheck<Solid>(new Vector2(Left - player.Width / 2, at.Y))))
                 {
                     if (player.Right - Right <= 4)
                         player.Right = Right;
-                    else if (dir.X == 0 && TryCorrectPlayerPosition(player, new Vector2(Right + (player.Width / 2), at.Y)))
+                    else if (dir.X == 0 && TryCorrectPlayerPosition(player, new Vector2(Right + player.Width / 2, at.Y)))
                         changeState = false;
                     else if (dir.X != 0 && !Scene.CollideCheck<Solid>(CenterRight + Vector2.UnitX))
-                    {
-                        ; // Messy
-                    }
+                    { }
                     else
                         return false;
                 }
-            }
+                break;
         }
 
         if (changeState)
@@ -218,15 +217,13 @@ public class DreamTunnelEntry : AbstractPanel
         return true;
     }
 
-    private bool TryCorrectPlayerPosition(Player player, Vector2 at)
+    private static bool TryCorrectPlayerPosition(Player player, Vector2 at)
     {
-        if (!player.CollideCheck<Solid>(at))
-        {
-            player.Position = at;
-            return true;
-        }
-
-        return false;
+        if (player.CollideCheck<Solid>(at))
+            return false;
+        
+        player.Position = at;
+        return true;
     }
 
     public override void Added(Scene scene)
@@ -269,18 +266,19 @@ public class DreamTunnelEntry : AbstractPanel
     {
         base.Update();
 
-        if (PlayerHasDreamDash)
+        if (!PlayerHasDreamDash)
+            return;
+        
+        animTimer += 6f * Engine.DeltaTime;
+        wobbleEase += Engine.DeltaTime * 2f;
+        if (wobbleEase > 1f)
         {
-            animTimer += 6f * Engine.DeltaTime;
-            wobbleEase += Engine.DeltaTime * 2f;
-            if (wobbleEase > 1f)
-            {
-                wobbleEase = 0f;
-                wobbleFrom = wobbleTo;
-                wobbleTo = Calc.Random.NextFloat(Calc.Circle);
-            }
-            surfaceSoundIndex = SurfaceIndex.DreamBlockActive;
+            wobbleEase = 0f;
+            wobbleFrom = wobbleTo;
+            wobbleTo = Calc.Random.NextFloat(Calc.Circle);
         }
+            
+        surfaceSoundIndex = SurfaceIndex.DreamBlockActive;
     }
 
     public override void Removed(Scene scene)
@@ -291,14 +289,14 @@ public class DreamTunnelEntry : AbstractPanel
         dummy.RemoveSelf();
     }
 
-    public void FootstepRipple(Vector2 position)
+    private void FootstepRipple(Vector2 position)
     {
-        if (PlayerHasDreamDash)
-        {
-            DisplacementRenderer.Burst burst = level.Displacement.AddBurst(position, 0.5f, 0f, 40f, 1f);
-            burst.WorldClipCollider = Collider;
-            burst.WorldClipPadding = 1;
-        }
+        if (!PlayerHasDreamDash)
+            return;
+        
+        DisplacementRenderer.Burst burst = level.Displacement.AddBurst(position, 0.5f, 0f, 40f, 1f);
+        burst.WorldClipCollider = Collider;
+        burst.WorldClipPadding = 1;
     }
 
     public override void Render()
@@ -306,32 +304,35 @@ public class DreamTunnelEntry : AbstractPanel
         Camera camera = SceneAs<Level>().Camera;
         if (Right < camera.Left || Left > camera.Right || Bottom < camera.Top || Top > camera.Bottom)
             return;
+        
         Vector2 position = lockedCamera ?? camera.Position;
         for (int i = 0; i < particles.Length; i++)
         {
             int layer = particles[i].Layer;
             Vector2 drawPos = particles[i].Position;
-            drawPos += position * (0.3f + (0.25f * layer));
+            drawPos += position * (0.3f + 0.25f * layer);
             drawPos = this.PutInside(drawPos);
-            MTexture mtexture;
-            if (layer == 0)
+            
+            MTexture mTexture;
+            switch (layer)
             {
-                int num = (int) (((particles[i].TimeOffset * 4f) + animTimer) % 4f);
-                mtexture = particleTextures[3 - num];
+                case 0:
+                    int num = (int) ((particles[i].TimeOffset * 4f + animTimer) % 4f);
+                    mTexture = particleTextures[3 - num];
+                    break;
+                
+                case 1:
+                    int num2 = (int) ((particles[i].TimeOffset * 2f + animTimer) % 2f);
+                    mTexture = particleTextures[1 + num2];
+                    break;
+                
+                default:
+                    mTexture = particleTextures[2];
+                    break;
             }
-            else if (layer == 1)
-            {
-                int num2 = (int) (((particles[i].TimeOffset * 2f) + animTimer) % 2f);
-                mtexture = particleTextures[1 + num2];
-            }
-            else
-            {
-                mtexture = particleTextures[2];
-            }
+            
             if (drawPos.X >= X + 2f && drawPos.Y >= Y + 2f && drawPos.X < Right - 2f && drawPos.Y < Bottom - 2f)
-            {
-                mtexture.DrawCentered(drawPos + shake, particles[i].Color * Alpha);
-            }
+                mTexture.DrawCentered(drawPos + shake, particles[i].Color * Alpha);
         }
     }
 
@@ -340,70 +341,80 @@ public class DreamTunnelEntry : AbstractPanel
     {
         float length = (to - from).Length();
         Vector2 vector = Vector2.Normalize(to - from);
-        Vector2 vector2 = new(vector.Y, -vector.X);
-        Color lineColor = PlayerHasDreamDash ? CustomDreamBlock.ActiveLineColor : CustomDreamBlock.DisabledLineColor;
-        Color backColor = PlayerHasDreamDash ? CustomDreamBlock.ActiveBackColor : CustomDreamBlock.DisabledBackColor;
-        if (Whitefill > 0f)
+        Vector2 perp = new(vector.Y, -vector.X);
+
+        (Color? controllerActiveBackColor,
+            Color? controllerDisabledBackColor,
+            Color? controllerActiveLineColor,
+            Color? controllerDisabledLineColor,
+            _) = Imports.PandorasBox.GetVisualSettingsFor(this);
+
+        Color backColor = PlayerHasDreamDash
+            ? controllerActiveBackColor ?? DreamBlock.activeBackColor
+            : controllerDisabledBackColor ?? DreamBlock.disabledBackColor;
+        Color lineColor = PlayerHasDreamDash
+            ? controllerActiveLineColor ?? DreamBlock.activeLineColor
+            : controllerDisabledLineColor ?? DreamBlock.disabledLineColor;
+        
+        if (WhiteFill > 0f)
         {
-            lineColor = Color.Lerp(lineColor, Color.White, Whitefill) * Alpha;
-            backColor = Color.Lerp(backColor, Color.White, Whitefill) * Alpha;
+            lineColor = Color.Lerp(lineColor, Color.White, WhiteFill) * Alpha;
+            backColor = Color.Lerp(backColor, Color.White, WhiteFill) * Alpha;
         }
+        
         float scaleFactor = 0f;
         int interval = 8;
         for (int i = 0; i < length; i += interval)
         {
             float lerp = MathHelper.Lerp(LineAmplitude(wobbleFrom + offset, i), LineAmplitude(wobbleTo + offset, i), wobbleEase);
             if (i + interval >= length)
-            {
                 lerp = 0f;
-            }
-            float num5 = Math.Min(interval, length - i);
-            Vector2 vector3 = from + (vector * i) + (vector2 * scaleFactor);
-            Vector2 vector4 = from + (vector * (i + num5)) + (vector2 * lerp);
+            
+            float endFactor = Math.Min(interval, length - i);
+            Vector2 segmentStart = from + vector * i + perp * scaleFactor;
+            Vector2 segmentEnd = from + vector * (i + endFactor) + perp * lerp;
+            
             if (back)
             {
-                Draw.Line(vector3 - vector2, vector4 - vector2, backColor);
-                Draw.Line(vector3 - (vector2 * 2f), vector4 - (vector2 * 2f), backColor);
-                Draw.Line(vector3 - (vector2 * 8f), vector4 - (vector2 * 8f), backColor * 0.95f);
-                Draw.Line(vector3 - (vector2 * 9f), vector4 - (vector2 * 9f), backColor * 0.7f);
-                Draw.Line(vector3 - (vector2 * 10f), vector4 - (vector2 * 10f), backColor * 0.4f);
-                Draw.Line(vector3 - (vector2 * 11f), vector4 - (vector2 * 11f), backColor * 0.2f);
+                Draw.Line(segmentStart - perp, segmentEnd - perp, backColor);
+                Draw.Line(segmentStart - perp * 2f, segmentEnd - perp * 2f, backColor);
+                Draw.Line(segmentStart - perp * 8f, segmentEnd - perp * 8f, backColor * 0.95f);
+                Draw.Line(segmentStart - perp * 9f, segmentEnd - perp * 9f, backColor * 0.7f);
+                Draw.Line(segmentStart - perp * 10f, segmentEnd - perp * 10f, backColor * 0.4f);
+                Draw.Line(segmentStart - perp * 11f, segmentEnd - perp * 11f, backColor * 0.2f);
             }
             if (line)
-                Draw.Line(vector3, vector4, lineColor);
+                Draw.Line(segmentStart, segmentEnd, lineColor);
+            
             scaleFactor = lerp;
         }
     }
 
     private float LineAmplitude(float seed, float index)
-    {
-        return (float) (Math.Sin(seed + (index / 16f) + (Math.Sin((seed * 2f) + (index / 32f)) * Calc.Circle)) + 1.0) * 1.5f;
-    }
+        => (MathF.Sin(seed + index / 16f + MathF.Sin(seed * 2f + index / 32f) * MathF.PI * 2f) + 1.0f) * 1.5f;
 
-    public void Setup()
+    private void Setup()
     {
         particles = new DreamParticle[(int) (Width / 4f * (Height / 4f) * 0.5f)];
+
+        (_, _, _, _, List<List<Color>> particleLayerColors) = Imports.PandorasBox.GetVisualSettingsFor(this);
+        
         for (int i = 0; i < particles.Length; i++)
         {
             particles[i].Position = new Vector2(Calc.Random.NextFloat(Width), Calc.Random.NextFloat(Height));
             particles[i].Layer = Calc.Random.Choose(0, 1, 1, 2, 2, 2);
             particles[i].TimeOffset = Calc.Random.NextFloat();
-            particles[i].Color = Color.LightGray * (0.5f + (particles[i].Layer / 2f * 0.5f));
-            if (PlayerHasDreamDash)
-            {
-                switch (particles[i].Layer)
-                {
-                    case 0:
-                        particles[i].Color = Calc.Random.Choose(Calc.HexToColor("FFEF11"), Calc.HexToColor("FF00D0"), Calc.HexToColor("08a310"));
-                        break;
-                    case 1:
-                        particles[i].Color = Calc.Random.Choose(Calc.HexToColor("5fcde4"), Calc.HexToColor("7fb25e"), Calc.HexToColor("E0564C"));
-                        break;
-                    case 2:
-                        particles[i].Color = Calc.Random.Choose(Calc.HexToColor("5b6ee1"), Calc.HexToColor("CC3B3B"), Calc.HexToColor("7daa64"));
-                        break;
-                }
-            }
+            particles[i].Color = PlayerHasDreamDash
+                ? particleLayerColors is not null
+                    ? Calc.Random.Choose(particleLayerColors[particles[i].Layer])
+                    : particles[i].Layer switch
+                    {
+                        0 => Calc.Random.Choose(CustomDreamBlock.DreamColors[0], CustomDreamBlock.DreamColors[1], CustomDreamBlock.DreamColors[2]),
+                        1 => Calc.Random.Choose(CustomDreamBlock.DreamColors[3], CustomDreamBlock.DreamColors[4], CustomDreamBlock.DreamColors[5]),
+                        2 => Calc.Random.Choose(CustomDreamBlock.DreamColors[6], CustomDreamBlock.DreamColors[7], CustomDreamBlock.DreamColors[8]),
+                        _ => throw new NotImplementedException()
+                    }
+                : Color.LightGray * (0.5f + particles[i].Layer / 2f * 0.5f);
         }
     }
 
@@ -411,48 +422,48 @@ public class DreamTunnelEntry : AbstractPanel
 
     public void ActivateNoRoutine()
     {
-        if (!PlayerHasDreamDash)
-        {
-            PlayerHasDreamDash = true;
-            Setup();
-            Remove(occlude);
-        }
+        if (PlayerHasDreamDash)
+            return;
+        
+        PlayerHasDreamDash = true;
+        Setup();
+        Remove(occlude);
     }
 
     public void DeactivateNoRoutine()
     {
-        if (PlayerHasDreamDash)
-        {
-            PlayerHasDreamDash = false;
-            Setup();
-            occlude ??= new LightOcclude(1f);
-            Add(occlude);
-            surfaceSoundIndex = SurfaceIndex.DreamBlockInactive;
-        }
+        if (!PlayerHasDreamDash)
+            return;
+        
+        PlayerHasDreamDash = false;
+        Setup();
+        occlude ??= new LightOcclude(1f);
+        Add(occlude);
+        surfaceSoundIndex = SurfaceIndex.DreamBlockInactive;
     }
 
-    public IEnumerator Activate()
+    private IEnumerator Activate()
     {
         Logger.Log(LogLevel.Warn, "CommunalHelper", "Dreamblock activation/deactivation animations are not yet implemented for DreamTunnelEntry, and are subject to change.");
         yield return null;
         ActivateNoRoutine();
     }
 
-    public IEnumerator FastActivate()
+    private IEnumerator FastActivate()
     {
         Logger.Log(LogLevel.Warn, "CommunalHelper", "Dreamblock activation/deactivation animations are not yet implemented for DreamTunnelEntry, and are subject to change.");
         yield return null;
         ActivateNoRoutine();
     }
 
-    public IEnumerator Deactivate()
+    private IEnumerator Deactivate()
     {
         Logger.Log(LogLevel.Warn, "CommunalHelper", "Dreamblock activation/deactivation animations are not yet implemented for DreamTunnelEntry, and are subject to change.");
         yield return null;
         DeactivateNoRoutine();
     }
 
-    public IEnumerator FastDeactivate()
+    private IEnumerator FastDeactivate()
     {
         Logger.Log(LogLevel.Warn, "CommunalHelper", "Dreamblock activation/deactivation animations are not yet implemented for DreamTunnelEntry, and are subject to change.");
         yield return null;
@@ -505,16 +516,16 @@ public class DreamTunnelEntry : AbstractPanel
          * if (player.onGround && player.DashDir.X != 0f && player.DashDir.Y > 0f && player.Speed.Y > 0f &&
          *  (!player.Inventory.DreamDash || !player.CollideCheck<DreamBlock>(player.Position + Vector2.UnitY)))
          */
+        
         ILCursor cursor = new(il);
+        
         // oof
         cursor.GotoNext(MoveType.After, instr => instr.OpCode == OpCodes.Callvirt &&
             ((MethodReference) instr.Operand).FullName == "System.Boolean Monocle.Entity::CollideCheck<Celeste.DreamBlock>(Microsoft.Xna.Framework.Vector2)");
+        
         cursor.Emit(OpCodes.Ldarg_0);
-        cursor.Emit(OpCodes.Ldfld, typeof(Player).GetMethod("DashCoroutine", BindingFlags.NonPublic | BindingFlags.Instance).GetStateMachineTarget().DeclaringType.GetField("<>4__this"));
-        cursor.EmitDelegate<Func<bool, Player, bool>>((v, player) =>
-        {
-            return v || player.CollideCheck<DreamTunnelEntry>(player.Position + Vector2.UnitY);
-        });
+        cursor.Emit(OpCodes.Ldfld, typeof(Player).GetMethod("DashCoroutine", BindingFlags.NonPublic | BindingFlags.Instance).GetStateMachineTarget().DeclaringType!.GetField("<>4__this"));
+        cursor.EmitDelegate<Func<bool, Player, bool>>((v, player) => v || player.CollideCheck<DreamTunnelEntry>(player.Position + Vector2.UnitY));
     }
 
     #region FootstepRipples
@@ -524,19 +535,20 @@ public class DreamTunnelEntry : AbstractPanel
         ILCursor cursor = new(il);
 
         cursor.GotoNext(instr => instr.MatchIsinst<DreamBlock>());
+        
         cursor.Emit(OpCodes.Ldarg_0);
         cursor.EmitDelegate<Func<Platform, Player, Platform>>((platform, player) =>
         {
             foreach (StaticMover sm in DynamicData.For(platform).Get<List<StaticMover>>("staticMovers"))
             {
                 Vector2 origin = player.Position + new Vector2((float) player.Facing * 3, -4f);
+                
                 if (sm.Entity is DreamTunnelEntry entry
-                    && (entry.Orientation is Spikes.Directions.Left or Spikes.Directions.Right)
-                    && entry.CollidePoint(origin + (Vector2.UnitX * (float) player.Facing)))
-                {
+                    && entry.Orientation is Spikes.Directions.Left or Spikes.Directions.Right
+                    && entry.CollidePoint(origin + Vector2.UnitX * (float) player.Facing))
                     entry.FootstepRipple(origin);
-                }
             }
+            
             return platform;
         });
     }
@@ -546,17 +558,18 @@ public class DreamTunnelEntry : AbstractPanel
         ILCursor cursor = new(il);
 
         cursor.GotoNext(instr => instr.MatchIsinst<DreamBlock>());
+        
         cursor.Emit(OpCodes.Ldarg_0);
         cursor.EmitDelegate<Func<Platform, Player, Platform>>((platform, player) =>
         {
             foreach (StaticMover sm in DynamicData.For(platform).Get<List<StaticMover>>("staticMovers"))
             {
-                if (sm.Entity is DreamTunnelEntry entry && entry.Orientation == Spikes.Directions.Up
+                if (sm.Entity is DreamTunnelEntry entry
+                    && entry.Orientation == Spikes.Directions.Up
                     && player.CollideCheck(entry, player.Position + Vector2.UnitY))
-                {
                     entry.FootstepRipple(player.Position);
-                }
             }
+            
             return platform;
         });
     }
@@ -573,12 +586,11 @@ public class DreamTunnelEntry : AbstractPanel
             foreach (StaticMover sm in DynamicData.For(platform).Get<List<StaticMover>>("staticMovers"))
             {
                 if (sm.Entity is DreamTunnelEntry entry
-                    && (entry.Orientation is Spikes.Directions.Left or Spikes.Directions.Right)
-                    && entry.CollidePoint(player.Position - (Vector2.UnitX * dir * 4f)))
-                {
+                    && entry.Orientation is Spikes.Directions.Left or Spikes.Directions.Right
+                    && entry.CollidePoint(player.Position - Vector2.UnitX * dir * 4f))
                     entry.FootstepRipple(player.Position + new Vector2(0, -4f));
-                }
             }
+            
             return platform;
         });
     }
@@ -592,5 +604,4 @@ public class DreamTunnelEntry : AbstractPanel
     }
 
     #endregion
-
 }

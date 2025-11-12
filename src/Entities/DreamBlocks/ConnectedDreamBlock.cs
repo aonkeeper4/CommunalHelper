@@ -17,59 +17,50 @@ public class ConnectedDreamBlock : CustomDreamBlock
 {
     private readonly struct SpaceJamTile
     {
-        public readonly int X, Y;
-        public readonly int[] Edges;
+        private readonly int[] edges;
         public readonly bool Exist;
 
         public SpaceJamTile(int x, int y, bool exist)
         {
-            X = x;
-            Y = y;
-            Edges = new int[4];
-            for (int i = 0; i < Edges.Length; i++)
-                Edges[i] = -1;
+            edges = new int[4];
+            for (int i = 0; i < edges.Length; i++)
+                edges[i] = -1;
 
             Exist = exist;
         }
 
-        public bool EdgeExist(Edges edge)
-        {
-            return Edges[(int) edge] != -1;
-        }
-
         public bool TryGetEdge(Edges edge, out int result)
         {
-            result = Edges[(int) edge];
+            result = edges[(int) edge];
             return result != -1;
         }
 
         public int this[Edges edge]
         {
-            get => Edges[(int) edge];
-            set => Edges[(int) edge] = value;
+            get => edges[(int) edge];
+            set => edges[(int) edge] = value;
         }
-
     }
 
-    private struct SpaceJamEdge(Vector2 startV, Vector2 endV, float wobbleOff, bool flipNorm, Edges face)
+    private struct SpaceJamEdge(Vector2 startV, Vector2 endV, float wobbleOff, bool flipNormal, Edges facing)
     {
-        public Vector2 start = startV, end = endV;
-        public float wobbleOffset = wobbleOff;
-        public bool flipNormal = flipNorm;
-        public Edges facing = face;
+        public Vector2 Start = startV, End = endV;
+        public float WobbleOffset = wobbleOff;
+        public bool FlipNormal = flipNormal;
+        public Edges Facing = facing;
     }
 
     private readonly struct SpaceJamCorner(int x, int y, bool ur, bool ul, bool dr, bool dl, bool iur, bool iul, bool idr, bool idl)
     {
         public readonly bool
-            upright = ur, upleft = ul, downright = dr, downleft = dl,
-            inupright = iur, inupleft = iul, indownright = idr, indownleft = idl;
+            UpRight = ur, UpLeft = ul, DownRight = dr, DownLeft = dl,
+            InUpRight = iur, InUpLeft = iul, InDownRight = idr, InDownLeft = idl;
         public readonly int x = x, y = y;
     }
 
-    private List<SpaceJamEdge> GroupEdges;
-    private List<SpaceJamCorner> GroupCorners;
-    private Rectangle GroupRect;
+    private List<SpaceJamEdge> groupEdges;
+    private List<SpaceJamCorner> groupCorners;
+    private Rectangle groupRect;
 
     private enum Edges
     {
@@ -79,19 +70,17 @@ public class ConnectedDreamBlock : CustomDreamBlock
         West,
     }
 
-    private static readonly MethodInfo m_DreamBlock_LineAmplitude = typeof(DreamBlock).GetMethod("LineAmplitude", BindingFlags.NonPublic | BindingFlags.Instance);
+    private Vector2 groupBoundsMin;
+    private Vector2 groupBoundsMax;
+    private Vector2 groupOffset;
 
-    public Vector2 GroupBoundsMin;
-    public Vector2 GroupBoundsMax;
-    public Vector2 GroupOffset;
+    private bool hasGroup;
 
-    public bool HasGroup { get; private set; }
-
-    public bool MasterOfGroup { get; private set; }
-    public Dictionary<Platform, Vector2> Moves;
-    public List<ConnectedDreamBlock> Group;
-    public List<JumpThru> JumpThrus;
-    protected ConnectedDreamBlock master;
+    protected bool MasterOfGroup { get; private set; }
+    protected Dictionary<Platform, Vector2> Moves;
+    protected List<ConnectedDreamBlock> Group;
+    protected List<JumpThru> JumpThrus;
+    protected ConnectedDreamBlock Master;
 
     protected bool IncludeJumpThrus = false;
 
@@ -102,59 +91,59 @@ public class ConnectedDreamBlock : CustomDreamBlock
     {
         base.Awake(scene);
 
-        if (!HasGroup)
+        if (hasGroup)
+            return;
+        
+        // Setup group
+        MasterOfGroup = true;
+
+        Moves = [];
+        Group = [];
+        JumpThrus = [];
+
+        groupBoundsMin = new Vector2(X, Y);
+        groupBoundsMax = new Vector2(Right, Bottom);
+        groupEdges = [];
+        groupCorners = [];
+        AddToGroupAndFindChildren(this);
+        SetupCustomParticles(0, 0); // Parameters are ignored
+
+        groupRect = new Rectangle(
+            (int) groupBoundsMin.X,
+            (int) groupBoundsMin.Y,
+            (int) (groupBoundsMax.X - groupBoundsMin.X),
+            (int) (groupBoundsMax.Y - groupBoundsMin.Y));
+        groupOffset = new Vector2(groupBoundsMin.X, groupBoundsMin.Y) - Position;
+
+        float groupW = groupBoundsMax.X - groupBoundsMin.X;
+        float groupH = groupBoundsMax.Y - groupBoundsMin.Y;
+
+        // Setup edges of the group
+        int groupTileW = (int) (groupW / 8.0f);
+        int groupTileH = (int) (groupH / 8.0f);
+        SpaceJamTile[,] tiles = new SpaceJamTile[groupTileW + 2, groupTileH + 2];
+        for (int x = 0; x < groupTileW + 2; x++)
+            for (int y = 0; y < groupTileH + 2; y++)
+                tiles[x, y] = new SpaceJamTile(x - 1, y - 1, TileHasGroupDreamBlock(x - 1, y - 1));
+
+        for (int x = 1; x < groupTileW + 1; x++)
+            for (int y = 1; y < groupTileH + 1; y++)
+                if (tiles[x, y].Exist)
+                    AutoEdge(tiles, x, y);
+
+        Vector2 groupCenter = new(groupW / 2, groupH / 2);
+        for (int i = 0; i < groupEdges.Count; i++)
         {
-            /* Setup group */
-            MasterOfGroup = true;
-
-            Moves = [];
-            Group = [];
-            JumpThrus = [];
-
-            GroupBoundsMin = new Vector2(X, Y);
-            GroupBoundsMax = new Vector2(Right, Bottom);
-            GroupEdges = [];
-            GroupCorners = [];
-            AddToGroupAndFindChildren(this);
-            SetupCustomParticles(0, 0); // Parameters are ignored
-
-            GroupRect = new Rectangle(
-                (int) GroupBoundsMin.X,
-                (int) GroupBoundsMin.Y,
-                (int) (GroupBoundsMax.X - GroupBoundsMin.X),
-                (int) (GroupBoundsMax.Y - GroupBoundsMin.Y));
-            GroupOffset = new Vector2(GroupBoundsMin.X, GroupBoundsMin.Y) - Position;
-
-            float groupW = GroupBoundsMax.X - GroupBoundsMin.X;
-            float groupH = GroupBoundsMax.Y - GroupBoundsMin.Y;
-
-            /* Setup Edges of the group */
-            int groupTileW = (int) (groupW / 8.0f);
-            int groupTileH = (int) (groupH / 8.0f);
-            SpaceJamTile[,] tiles = new SpaceJamTile[(groupTileW + 2), (groupTileH + 2)];
-            for (int x = 0; x < groupTileW + 2; x++)
-                for (int y = 0; y < groupTileH + 2; y++)
-                    tiles[x, y] = new SpaceJamTile(x - 1, y - 1, TileHasGroupDreamBlock(x - 1, y - 1));
-
-            for (int x = 1; x < groupTileW + 1; x++)
-                for (int y = 1; y < groupTileH + 1; y++)
-                    if (tiles[x, y].Exist)
-                        AutoEdge(tiles, x, y);
-
-            Vector2 groupCenter = new(groupW / 2, groupH / 2);
-            for (int i = 0; i < GroupEdges.Count; i++)
-            {
-                SpaceJamEdge edge = GroupEdges[i];
-                float angle = Calc.Angle(groupCenter, Vector2.Lerp(edge.start, edge.end, 0.5f)) + Calc.HalfCircle;
-                GroupEdges[i] = new SpaceJamEdge(edge.start, edge.end, edge.wobbleOffset + angle, edge.flipNormal, edge.facing);
-            }
+            SpaceJamEdge edge = groupEdges[i];
+            float angle = Calc.Angle(groupCenter, Vector2.Lerp(edge.Start, edge.End, 0.5f)) + Calc.HalfCircle;
+            groupEdges[i] = new SpaceJamEdge(edge.Start, edge.End, edge.WobbleOffset + angle, edge.FlipNormal, edge.Facing);
         }
     }
 
-    public override void SetupCustomParticles(float canvasWidth, float canvasHeight)
+    protected override void SetupCustomParticles(float canvasWidth, float canvasHeight)
     {
         if (MasterOfGroup)
-            base.SetupCustomParticles(GroupBoundsMax.X - GroupBoundsMin.X, GroupBoundsMax.Y - GroupBoundsMin.Y);
+            base.SetupCustomParticles(groupBoundsMax.X - groupBoundsMin.X, groupBoundsMax.Y - groupBoundsMin.Y);
     }
 
     protected override void UpdateParticles()
@@ -176,39 +165,39 @@ public class ConnectedDreamBlock : CustomDreamBlock
         SpaceJamTile nNorthWest = tiles[x - 1, y - 1];
 
         #region Corner stuff
-        bool upright = !nNorth.Exist && !nEast.Exist;
-        bool upleft = !nNorth.Exist && !nWest.Exist;
-        bool downright = !nSouth.Exist && !nEast.Exist;
-        bool downleft = !nSouth.Exist && !nWest.Exist;
-        bool inupright = nNorth.Exist && nEast.Exist && !nNorthEast.Exist;
-        bool inupleft = nNorth.Exist && nWest.Exist && !nNorthWest.Exist;
-        bool indownright = nSouth.Exist && nEast.Exist && !nSouthEast.Exist;
-        bool indownleft = nSouth.Exist && nWest.Exist && !nSouthWest.Exist;
-        if (upright || upleft || downright || downleft || inupright || inupleft || indownright || indownleft)
-        {
-            GroupCorners.Add(new SpaceJamCorner(x - 1, y - 1, upright, upleft, downright, downleft, inupright, inupleft, indownright, indownleft));
-        }
+        
+        bool upRight = !nNorth.Exist && !nEast.Exist;
+        bool upLeft = !nNorth.Exist && !nWest.Exist;
+        bool downRight = !nSouth.Exist && !nEast.Exist;
+        bool downLeft = !nSouth.Exist && !nWest.Exist;
+        bool inUpRight = nNorth.Exist && nEast.Exist && !nNorthEast.Exist;
+        bool inUpLeft = nNorth.Exist && nWest.Exist && !nNorthWest.Exist;
+        bool inDownRight = nSouth.Exist && nEast.Exist && !nSouthEast.Exist;
+        bool inDownLeft = nSouth.Exist && nWest.Exist && !nSouthWest.Exist;
+        if (upRight || upLeft || downRight || downLeft || inUpRight || inUpLeft || inDownRight || inDownLeft)
+            groupCorners.Add(new SpaceJamCorner(x - 1, y - 1, upRight, upLeft, downRight, downLeft, inUpRight, inUpLeft, inDownRight, inDownLeft));
+        
         #endregion
 
         if (!nNorth.Exist)
         {
             if (nWest.TryGetEdge(Edges.North, out int idx))
             {
-                SpaceJamEdge edge = GroupEdges[idx];
-                edge.end.X += 8;
-                GroupEdges[idx] = edge;
+                SpaceJamEdge edge = groupEdges[idx];
+                edge.End.X += 8;
+                groupEdges[idx] = edge;
                 self[Edges.North] = idx;
             }
             else
             {
                 SpaceJamEdge newEdge;
-                newEdge.end = newEdge.start = TileToPoint(x - 1, y - 1);
-                newEdge.end.X += 8;
-                newEdge.wobbleOffset = 0.0f;
-                newEdge.flipNormal = false;
-                newEdge.facing = Edges.North;
-                self[Edges.North] = GroupEdges.Count;
-                GroupEdges.Add(newEdge);
+                newEdge.End = newEdge.Start = TileToPoint(x - 1, y - 1);
+                newEdge.End.X += 8;
+                newEdge.WobbleOffset = 0.0f;
+                newEdge.FlipNormal = false;
+                newEdge.Facing = Edges.North;
+                self[Edges.North] = groupEdges.Count;
+                groupEdges.Add(newEdge);
             }
         }
 
@@ -216,25 +205,23 @@ public class ConnectedDreamBlock : CustomDreamBlock
         {
             if (nNorth.TryGetEdge(Edges.East, out int idx))
             {
-                SpaceJamEdge edge = GroupEdges[idx];
-                edge.end.Y += (nSouth.Exist && nSouthEast.Exist) ? 9 : 8;
-                GroupEdges[idx] = edge;
+                SpaceJamEdge edge = groupEdges[idx];
+                edge.End.Y += nSouth.Exist && nSouthEast.Exist ? 9 : 8;
+                groupEdges[idx] = edge;
                 self[Edges.East] = idx;
             }
             else
             {
                 SpaceJamEdge newEdge;
-                newEdge.end = newEdge.start = TileToPoint(x, y - 1);
-                newEdge.end.Y += (nSouth.Exist && nSouthEast.Exist) ? 9 : 8;
+                newEdge.End = newEdge.Start = TileToPoint(x, y - 1);
+                newEdge.End.Y += nSouth.Exist && nSouthEast.Exist ? 9 : 8;
                 if (nNorth.Exist)
-                {
-                    newEdge.start.Y -= 1;
-                }
-                newEdge.wobbleOffset = 0.7f;
-                newEdge.flipNormal = false;
-                newEdge.facing = Edges.East;
-                self[Edges.East] = GroupEdges.Count;
-                GroupEdges.Add(newEdge);
+                    newEdge.Start.Y -= 1;
+                newEdge.WobbleOffset = 0.7f;
+                newEdge.FlipNormal = false;
+                newEdge.Facing = Edges.East;
+                self[Edges.East] = groupEdges.Count;
+                groupEdges.Add(newEdge);
             }
         }
 
@@ -242,23 +229,23 @@ public class ConnectedDreamBlock : CustomDreamBlock
         {
             if (nWest.TryGetEdge(Edges.South, out int idx))
             {
-                SpaceJamEdge edge = GroupEdges[idx];
-                edge.end.X += 8;
-                GroupEdges[idx] = edge;
+                SpaceJamEdge edge = groupEdges[idx];
+                edge.End.X += 8;
+                groupEdges[idx] = edge;
                 self[Edges.South] = idx;
             }
             else
             {
                 SpaceJamEdge newEdge;
-                newEdge.start = TileToPoint(x - 1, y);
-                newEdge.start.Y -= 1;
-                newEdge.end = newEdge.start;
-                newEdge.end.X += 8;
-                newEdge.wobbleOffset = 1.5f;
-                newEdge.flipNormal = true;
-                newEdge.facing = Edges.South;
-                self[Edges.South] = GroupEdges.Count;
-                GroupEdges.Add(newEdge);
+                newEdge.Start = TileToPoint(x - 1, y);
+                newEdge.Start.Y -= 1;
+                newEdge.End = newEdge.Start;
+                newEdge.End.X += 8;
+                newEdge.WobbleOffset = 1.5f;
+                newEdge.FlipNormal = true;
+                newEdge.Facing = Edges.South;
+                self[Edges.South] = groupEdges.Count;
+                groupEdges.Add(newEdge);
             }
         }
 
@@ -266,93 +253,79 @@ public class ConnectedDreamBlock : CustomDreamBlock
         {
             if (nNorth.TryGetEdge(Edges.West, out int idx))
             {
-                SpaceJamEdge edge = GroupEdges[idx];
-                edge.end.Y += (nSouth.Exist && nSouthWest.Exist) ? 9 : 8;
-                GroupEdges[idx] = edge;
+                SpaceJamEdge edge = groupEdges[idx];
+                edge.End.Y += nSouth.Exist && nSouthWest.Exist ? 9 : 8;
+                groupEdges[idx] = edge;
                 self[Edges.West] = idx;
             }
             else
             {
                 SpaceJamEdge newEdge;
-                newEdge.start = TileToPoint(x - 1, y - 1);
-                newEdge.start.X += 1;
-                newEdge.end = newEdge.start;
-                newEdge.end.Y += (nSouth.Exist && nSouthWest.Exist) ? 9 : 8;
+                newEdge.Start = TileToPoint(x - 1, y - 1);
+                newEdge.Start.X += 1;
+                newEdge.End = newEdge.Start;
+                newEdge.End.Y += nSouth.Exist && nSouthWest.Exist ? 9 : 8;
                 if (nNorth.Exist)
-                {
-                    newEdge.start.Y -= 1;
-                }
-                newEdge.wobbleOffset = 2.5f;
-                newEdge.flipNormal = true;
-                newEdge.facing = Edges.West;
-                self[Edges.West] = GroupEdges.Count;
-                GroupEdges.Add(newEdge);
+                    newEdge.Start.Y -= 1;
+                newEdge.WobbleOffset = 2.5f;
+                newEdge.FlipNormal = true;
+                newEdge.Facing = Edges.West;
+                self[Edges.West] = groupEdges.Count;
+                groupEdges.Add(newEdge);
             }
         }
     }
 
     private void AddToGroupAndFindChildren(ConnectedDreamBlock from)
     {
-        if (from.X < GroupBoundsMin.X)
-            GroupBoundsMin.X = from.X;
-
-        if (from.Y < GroupBoundsMin.Y)
-            GroupBoundsMin.Y = from.Y;
-
-        if (from.Right > GroupBoundsMax.X)
-            GroupBoundsMax.X = from.Right;
-
-        if (from.Bottom > GroupBoundsMax.Y)
-            GroupBoundsMax.Y = from.Bottom;
-
-
-        from.HasGroup = true;
+        if (from.X < groupBoundsMin.X)
+            groupBoundsMin.X = from.X;
+        if (from.Y < groupBoundsMin.Y)
+            groupBoundsMin.Y = from.Y;
+        if (from.Right > groupBoundsMax.X)
+            groupBoundsMax.X = from.Right;
+        if (from.Bottom > groupBoundsMax.Y)
+            groupBoundsMax.Y = from.Bottom;
+        
+        from.hasGroup = true;
         Group.Add(from);
         Moves.Add(from, from.Position);
         if (from != this)
-        {
-            from.master = this;
-        }
+            from.Master = this;
 
         if (IncludeJumpThrus)
         {
-            foreach (JumpThru jumpThru in Scene.CollideAll<JumpThru>(new Rectangle((int) from.X - 1, (int) from.Y, (int) from.Width + 2, (int) from.Height)))
-            {
-                if (!JumpThrus.Contains(jumpThru))
-                    AddJumpThru(jumpThru);
-            }
-
-            foreach (JumpThru jumpThru in Scene.CollideAll<JumpThru>(new Rectangle((int) from.X, (int) from.Y - 1, (int) from.Width, (int) from.Height + 2)))
-            {
-                if (!JumpThrus.Contains(jumpThru))
-                    AddJumpThru(jumpThru);
-            }
+            foreach (JumpThru jumpThru in Scene.CollideAll<JumpThru>(new Rectangle((int) from.X - 1, (int) from.Y, (int) from.Width + 2, (int) from.Height))
+                                               .Where(jumpThru => !JumpThrus.Contains(jumpThru)))
+                AddJumpThru(jumpThru);
+            foreach (JumpThru jumpThru in Scene.CollideAll<JumpThru>(new Rectangle((int) from.X, (int) from.Y - 1, (int) from.Width, (int) from.Height + 2))
+                                               .Where(jumpThru => !JumpThrus.Contains(jumpThru)))
+                AddJumpThru(jumpThru);
         }
 
-        foreach (Entity entity in Scene.Tracker.GetEntities<ConnectedDreamBlock>())
-        {
-            ConnectedDreamBlock connectedBlock = (ConnectedDreamBlock) entity;
-            if (!connectedBlock.HasGroup && connectedBlock.FeatherMode == from.FeatherMode &&
-                Scene.CollideCheck(new Rectangle((int) from.X, (int) from.Y, (int) from.Width, (int) from.Height), connectedBlock))
-            {
-                AddToGroupAndFindChildren(connectedBlock);
-            }
-        }
+        foreach (ConnectedDreamBlock connectedBlock in Scene.Tracker.GetEntities<ConnectedDreamBlock>()
+                                                                    .Cast<ConnectedDreamBlock>()
+                                                                    .Where(connectedBlock =>
+                                                                        !connectedBlock.hasGroup
+                                                                        && connectedBlock.FeatherMode == from.FeatherMode
+                                                                        && Scene.CollideCheck(new Rectangle((int) from.X, (int) from.Y, (int) from.Width, (int) from.Height),
+                                                                            connectedBlock)))
+            AddToGroupAndFindChildren(connectedBlock);
     }
 
     private void AddJumpThru(JumpThru jp)
     {
         JumpThrus.Add(jp);
         Moves.Add(jp, jp.Position);
-        foreach (Entity entity in Scene.Tracker.GetEntities<ConnectedDreamBlock>())
-        {
-            ConnectedDreamBlock connectedBlock = (ConnectedDreamBlock) entity;
-            if (!connectedBlock.HasGroup && connectedBlock.FeatherMode == FeatherMode &&
-                Scene.CollideCheck(new Rectangle((int) jp.X - 1, (int) jp.Y, (int) jp.Width + 2, (int) jp.Height), connectedBlock))
-            {
-                AddToGroupAndFindChildren(connectedBlock);
-            }
-        }
+        
+        foreach (ConnectedDreamBlock connectedBlock in Scene.Tracker.GetEntities<ConnectedDreamBlock>()
+                                                                    .Cast<ConnectedDreamBlock>()
+                                                                    .Where(connectedBlock =>
+                                                                        !connectedBlock.hasGroup
+                                                                        && connectedBlock.FeatherMode == FeatherMode
+                                                                        && Scene.CollideCheck(new Rectangle((int) jp.X - 1, (int) jp.Y, (int) jp.Width + 2, (int) jp.Height),
+                                                                            connectedBlock)))
+            AddToGroupAndFindChildren(connectedBlock);
     }
 
     protected virtual DashCollisionResults OnDash(Player player, Vector2 dir)
@@ -368,205 +341,183 @@ public class ConnectedDreamBlock : CustomDreamBlock
     public override void Render()
     {
         Camera camera = SceneAs<Level>().Camera;
-        Vector2 GroupPosition = new(GroupBoundsMin.X, GroupBoundsMin.Y);
+        Vector2 groupPosition = new(groupBoundsMin.X, groupBoundsMin.Y);
 
-        float whiteFill = baseData.Get<float>("whiteFill");
-        float whiteHeight = baseData.Get<float>("whiteHeight");
-        Vector2 shake = baseData.Get<Vector2>("shake");
+        Vector2 pos = Position + groupOffset + shake;
 
-        Vector2 pos = Position + GroupOffset + shake;
-
-        if (!CullHelper.IsRectangleVisible(pos.X, pos.Y, GroupRect.Width, GroupRect.Height, 0, camera))
-        {
+        if (!CullHelper.IsRectangleVisible(pos.X, pos.Y, groupRect.Width, groupRect.Height, 0, camera))
             return;
-        }
 
-        if (MasterOfGroup)
+        if (!MasterOfGroup)
+            return;
+
+        (Color? controllerActiveBackColor, Color? controllerDisabledBackColor, Color? controllerActiveLineColor, Color? controllerDisabledLineColor, _)
+            = Imports.PandorasBox.GetVisualSettingsFor(this);
+        Color backColor = Color.Lerp(PlayerHasDreamDash
+            ? controllerActiveBackColor ?? activeBackColor
+            : controllerDisabledBackColor ?? disabledBackColor, Color.White, ColorLerp);
+        Color lineColor = PlayerHasDreamDash
+            ? controllerActiveLineColor ?? activeLineColor
+            : controllerDisabledLineColor ?? disabledLineColor;
+            
+        if (whiteFill > 0f)
         {
-            Color lineColor = PlayerHasDreamDash ? ActiveLineColor : DisabledLineColor;
-            Color backColor = Color.Lerp(PlayerHasDreamDash ? baseData.Get<Color>("activeBackColor") : baseData.Get<Color>("disabledBackColor"), Color.White, ColorLerp);
-
-            if (whiteFill > 0f)
-            {
-                lineColor = Color.Lerp(lineColor, Color.White, whiteFill);
-                if (whiteHeight == 1f)
-                    backColor = Color.Lerp(backColor, Color.White, whiteFill);
-            }
-
-            #region Background rendering
-
-            foreach (ConnectedDreamBlock block in Group)
-            {
-                if (block.Right < camera.Left || block.Left > camera.Right || block.Bottom < camera.Top || block.Top > camera.Bottom)
-                {
-                    continue;
-                }
-                Draw.Rect(block.Position + shake, block.Width, block.Height, backColor);
-            }
-
-            #endregion
-
-            #region Particle rendering
-
-            for (int i = 0; i < particles.Length; i++)
-            {
-                DreamParticle particle = particles[i];
-                int layer = particle.Layer;
-                Vector2 position = particle.Position + (camera.Position * (0.3f + (0.25f * layer)));
-                float rotation = 0;
-                MTexture particleTexture;
-                if (FeatherMode)
-                {
-                    rotation = 1.5707963705062866f - 0.8f + (float) Math.Sin(particle.RotationCounter * particle.MaxRotate);
-                    position += Calc.AngleToVector(rotation, 4f);
-                    particleTexture = featherTextures[layer];
-                }
-                else
-                {
-                    MTexture[] particleTextures = RefillCount != -1 ? doubleRefillStarTextures : baseData.Get<MTexture[]>("particleTextures");
-                    switch (layer)
-                    {
-                        case 0:
-                        {
-                            int index = (int) (((particle.TimeOffset * 4f) + baseData.Get<float>("animTimer")) % 4f);
-                            particleTexture = particleTextures[3 - index];
-                            break;
-                        }
-                        case 1:
-                        {
-                            int index = (int) (((particle.TimeOffset * 2f) + baseData.Get<float>("animTimer")) % 2f);
-                            particleTexture = particleTextures[1 + index];
-                            break;
-                        }
-                        default:
-                            particleTexture = particleTextures[2];
-                            break;
-                    }
-                }
-                if (particleTexture is null)
-                {
-                    particleTexture = Draw.Particle; // this ensures the nullcheck doesn't break the CullHelper, since that's a possible option
-                }
-                position = PutInside(position, GroupRect);
-                if (!CullHelper.IsRectangleVisible(position.X, position.Y, particleTexture.Width, particleTexture.Height, 8, camera))
-                    continue;
-
-                bool particleIsInside = false;
-                foreach (ConnectedDreamBlock block in Group)
-                {
-                    if (block.CheckParticleCollide(position))
-                    {
-                        particleIsInside = true;
-                        break;
-                    }
-                }
-                if (!particleIsInside)
-                    continue;
-
-                Color color = Color.Lerp(particle.Color, Color.Black, ColorLerp);
-                if (whiteFill > 0f && whiteHeight == 1f)
-                    color = Color.Lerp(color, Color.White, whiteFill);
-
-                particleTexture.DrawCentered(position + Shake + shake, color, 1, rotation);
-            }
-
-            #endregion
-
-            #region (De)activation Rendering
-
-            if (whiteFill == 1f && whiteHeight < 1f)
-            {
-                float whiteFillBottom = GroupRect.Y + (GroupRect.Height * whiteHeight);
-                foreach (ConnectedDreamBlock block in Group)
-                {
-                    if (block.Right < camera.Left || block.Left > camera.Right || block.Bottom < camera.Top || block.Top > camera.Bottom)
-                    {
-                        continue;
-                    }
-                    if (block.Top <= whiteFillBottom)
-                        Draw.Rect(block.Position + shake, block.Width, Calc.Clamp(whiteFillBottom - block.Y, 1f, block.Height), Color.White);
-                }
-            }
-
-            #endregion
-
-            #region Edge & Corner Rendering
-
-            if (whiteFill > 0f && whiteHeight < 1f)
-            {
+            lineColor = Color.Lerp(lineColor, Color.White, whiteFill);
+            if (whiteHeight == 1f)
                 backColor = Color.Lerp(backColor, Color.White, whiteFill);
-            }
-
-            foreach (SpaceJamCorner corner in GroupCorners)
-            {
-                // Yes.
-                RenderCorner(GroupPosition + shake, corner, lineColor, backColor);
-            }
-
-            foreach (SpaceJamEdge edge in GroupEdges)
-            {
-                Vector2 start = edge.start, end = edge.end;
-                if (edge.flipNormal)
-                {
-                    start = edge.end;
-                    end = edge.start;
-
-                    if (start.X == end.X)
-                    {
-                        start.X -= 1;
-                        end.X -= 1;
-                    }
-                    if (start.Y == end.Y)
-                    {
-                        start.Y += 1;
-                        end.Y += 1;
-                    }
-                }
-                WobbleLine(GroupBoundsMin + start + shake, GroupBoundsMin + end + shake, edge.wobbleOffset, lineColor, backColor);
-            }
-
-            #endregion
         }
+
+        #region Background rendering
+
+        foreach (ConnectedDreamBlock block in Group.Where(block => !(block.Right < camera.Left)
+            && !(block.Left > camera.Right)
+            && !(block.Bottom < camera.Top)
+            && !(block.Top > camera.Bottom)))
+            Draw.Rect(block.Position + shake, block.Width, block.Height, backColor);
+
+        #endregion
+
+        #region Particle rendering
+
+        foreach (DreamParticle particle in Particles)
+        {
+            int layer = particle.Layer;
+            Vector2 position = particle.Position + camera.Position * (0.3f + 0.25f * layer);
+                
+            float rotation = 0;
+            MTexture particleTexture;
+            if (FeatherMode)
+            {
+                rotation = MathF.PI / 2f - 0.8f + MathF.Sin(particle.RotationCounter * particle.MaxRotate);
+                position += Calc.AngleToVector(rotation, 4f);
+                particleTexture = FeatherTextures[layer];
+            }
+            else
+            {
+                MTexture[] textures = RefillCount != -1 ? DoubleRefillStarTextures : particleTextures;
+                switch (layer)
+                {
+                    case 0:
+                        int i = (int) ((particle.TimeOffset * 4f + animTimer) % 4f);
+                        particleTexture = textures[3 - i];
+                        break;
+                        
+                    case 1:
+                        int j = (int) ((particle.TimeOffset * 2f + animTimer) % 2f);
+                        particleTexture = textures[1 + j];
+                        break;
+                        
+                    default:
+                        particleTexture = textures[2];
+                        break;
+                }
+            }
+            particleTexture ??= Draw.Particle;
+                
+            position = PutInside(position, groupRect);
+            if (!CullHelper.IsRectangleVisible(position.X, position.Y, particleTexture.Width, particleTexture.Height, 8, camera))
+                continue;
+
+            bool particleIsInside = Group.Any(block => block.CheckParticleCollide(position));
+            if (!particleIsInside)
+                continue;
+
+            Color color = Color.Lerp(particle.Color, Color.Black, ColorLerp);
+            if (whiteFill > 0f && whiteHeight == 1f)
+                color = Color.Lerp(color, Color.White, whiteFill);
+
+            particleTexture.DrawCentered(position + Shake + shake, color, 1, rotation);
+        }
+
+        #endregion
+
+        #region (De)activation Rendering
+
+        if (whiteFill == 1f && whiteHeight < 1f)
+        {
+            float whiteFillBottom = groupRect.Y + groupRect.Height * whiteHeight;
+            foreach (ConnectedDreamBlock block in Group.Where(block => !(block.Right < camera.Left) 
+                                                           && !(block.Left > camera.Right)
+                                                           && !(block.Bottom < camera.Top)
+                                                           && !(block.Top > camera.Bottom))
+                                                       .Where(block => block.Top <= whiteFillBottom))
+                Draw.Rect(block.Position + shake, block.Width, Calc.Clamp(whiteFillBottom - block.Y, 1f, block.Height), Color.White);
+        }
+
+        #endregion
+
+        #region Edge & Corner Rendering
+
+        if (whiteFill > 0f && whiteHeight < 1f)
+            backColor = Color.Lerp(backColor, Color.White, whiteFill);
+
+        foreach (SpaceJamCorner corner in groupCorners)
+            RenderCorner(groupPosition + shake, corner, lineColor, backColor);
+
+        foreach (SpaceJamEdge edge in groupEdges)
+        {
+            Vector2 start = edge.Start, end = edge.End;
+            if (edge.FlipNormal)
+            {
+                start = edge.End;
+                end = edge.Start;
+
+                if (start.X == end.X)
+                {
+                    start.X -= 1;
+                    end.X -= 1;
+                }
+                if (start.Y == end.Y)
+                {
+                    start.Y += 1;
+                    end.Y += 1;
+                }
+            }
+                
+            WobbleLine(groupBoundsMin + start + shake, groupBoundsMin + end + shake, edge.WobbleOffset, lineColor, backColor);
+        }
+
+        #endregion
     }
 
     private static void RenderCorner(Vector2 position, SpaceJamCorner corner, Color line, Color back)
     {
-        int x = (int) ((corner.x * 8) + position.X);
-        int y = (int) ((corner.y * 8) + position.Y);
+        int x = (int) (corner.x * 8 + position.X);
+        int y = (int) (corner.y * 8 + position.Y);
 
         // Simple corners:
-        if (corner.upright)
+        if (corner.UpRight)
             Draw.Rect(x + 6, y, 2, 2, line);
-        if (corner.upleft)
+        if (corner.UpLeft)
             Draw.Rect(x, y, 2, 2, line);
-        if (corner.downright)
+        if (corner.DownRight)
             Draw.Rect(x + 6, y + 6, 2, 2, line);
-        if (corner.downleft)
+        if (corner.DownLeft)
             Draw.Rect(x, y + 6, 2, 2, line);
 
         // Inner corners:
-        if (corner.inupright)
+        if (corner.InUpRight)
         {
             Draw.Rect(x + 6, y, 4, 3, back);
             Draw.Rect(x + 5, y - 1, 3, 3, back);
             Draw.Line(x + 7, y, x + 10, y, line);
             Draw.Line(x + 7, y, x + 7, y - 1, line);
         }
-        if (corner.inupleft)
+        if (corner.InUpLeft)
         {
             Draw.Rect(x - 2, y, 4, 3, back);
             Draw.Rect(x, y - 1, 3, 3, back);
             Draw.Line(x - 2, y, x, y, line);
             Draw.Line(x, y + 1, x, y - 1, line);
         }
-        if (corner.indownright)
+        if (corner.InDownRight)
         {
             Draw.Rect(x + 6, y + 5, 4, 3, back);
             Draw.Rect(x + 5, y + 6, 3, 3, back);
             Draw.Line(x + 7, y + 7, x + 10, y + 7, line);
             Draw.Line(x + 8, y + 8, x + 8, y + 9, line);
         }
-        if (corner.indownleft)
+        if (corner.InDownLeft)
         {
             Draw.Rect(x - 2, y + 5, 4, 3, back);
             Draw.Rect(x, y + 6, 3, 3, back);
@@ -580,26 +531,23 @@ public class ConnectedDreamBlock : CustomDreamBlock
         Vector2 vec = to - from;
         float length = vec.Length();
         Vector2 value = Vector2.Normalize(vec);
-        Vector2 vector = new(value.Y, 0f - value.X);
+        Vector2 perp = new(value.Y, -value.X);
 
         float scaleFactor = 0f;
         int increment = 16;
         for (int i = 2; i < length - 2; i += increment)
         {
-            float scale = MathHelper.Lerp((float) m_DreamBlock_LineAmplitude.Invoke(this, new object[] { baseData.Get<float>("wobbleFrom") + offset, i }),
-                (float) m_DreamBlock_LineAmplitude.Invoke(this, new object[] { baseData.Get<float>("wobbleTo") + offset, i }),
-                baseData.Get<float>("wobbleEase"));
+            float scale = MathHelper.Lerp(LineAmplitude(wobbleFrom + offset, i), LineAmplitude(wobbleTo + offset, i), wobbleEase);
             if (i + increment >= length)
-            {
                 scale = 0f;
-            }
-            float num4 = Math.Min(increment, length - 2f - i);
-            Vector2 vector2 = from + (value * i) + (vector * scaleFactor);
-            Vector2 vector3 = from + (value * (i + num4)) + (vector * scale);
-            Draw.Line(vector2 - vector, vector3 - vector, back);
-            Draw.Line(vector2 - (vector * 2f), vector3 - (vector * 2f), back);
-            //Draw.Line(vector2 - vector * 3f, vector3 - vector * 3f, back);
-            Draw.Line(vector2, vector3, line);
+            
+            float endFactor = Math.Min(increment, length - 2f - i);
+            Vector2 segmentStart = from + value * i + perp * scaleFactor;
+            Vector2 segmentEnd = from + value * (i + endFactor) + perp * scale;
+            Draw.Line(segmentStart - perp, segmentEnd - perp, back);
+            Draw.Line(segmentStart - perp * 2f, segmentEnd - perp * 2f, back);
+            Draw.Line(segmentStart, segmentEnd, line);
+            
             scaleFactor = scale;
         }
     }
@@ -607,75 +555,80 @@ public class ConnectedDreamBlock : CustomDreamBlock
     public override void MoveHExact(int move)
     {
         base.MoveHExact(move);
-        GroupBoundsMax.X += move;
-        GroupBoundsMin.X += move;
+        groupBoundsMax.X += move;
+        groupBoundsMin.X += move;
     }
 
     public override void MoveVExact(int move)
     {
         base.MoveVExact(move);
-        GroupBoundsMax.Y += move;
-        GroupBoundsMin.Y += move;
+        groupBoundsMax.Y += move;
+        groupBoundsMin.Y += move;
     }
 
     private void SpawnFastRoutineParticles()
     {
-        if (MasterOfGroup)
+        if (!MasterOfGroup)
+            return;
+        
+        Level level = SceneAs<Level>();
+        
+        foreach (SpaceJamEdge edge in groupEdges)
         {
-            Level level = SceneAs<Level>();
-            foreach (SpaceJamEdge edge in GroupEdges)
+            float width = edge.End.X - edge.Start.X;
+            float centerH = edge.Start.X + width / 2f;
+            float height = edge.End.Y - edge.Start.Y;
+            float centerV = edge.Start.Y + height / 2f;
+            
+            switch (edge.Facing)
             {
-                float width = edge.end.X - edge.start.X;
-                float centerH = edge.start.X + (width / 2f);
-                float height = edge.end.Y - edge.start.Y;
-                float centerV = edge.start.Y + (height / 2f);
-                if (edge.facing == Edges.North)
-                    level.ParticlesFG.Emit(Strawberry.P_WingsBurst, (int) width, new Vector2(centerH, edge.start.Y), Vector2.UnitX * width / 2f, Color.White, (float) Math.PI);
-                if (edge.facing == Edges.South)
-                    level.ParticlesFG.Emit(Strawberry.P_WingsBurst, (int) width, new Vector2(centerH, edge.end.Y), Vector2.UnitX * width / 2f, Color.White, 0f);
-                if (edge.facing == Edges.West)
-                    level.ParticlesFG.Emit(Strawberry.P_WingsBurst, (int) height, new Vector2(edge.start.X, centerV), Vector2.UnitY * height / 2f, Color.White, 4.712389f);
-                if (edge.facing == Edges.East)
-                    level.ParticlesFG.Emit(Strawberry.P_WingsBurst, (int) height, new Vector2(edge.end.X, centerV), Vector2.UnitY * height / 2f, Color.White, (float) Math.PI / 2f);
+                case Edges.North:
+                    level.ParticlesFG.Emit(Strawberry.P_WingsBurst, (int) width, new Vector2(centerH, edge.Start.Y), Vector2.UnitX * width / 2f, Color.White, MathF.PI);
+                    break;
+                
+                case Edges.South:
+                    level.ParticlesFG.Emit(Strawberry.P_WingsBurst, (int) width, new Vector2(centerH, edge.End.Y), Vector2.UnitX * width / 2f, Color.White, 0f);
+                    break;
+                
+                case Edges.West:
+                    level.ParticlesFG.Emit(Strawberry.P_WingsBurst, (int) height, new Vector2(edge.Start.X, centerV), Vector2.UnitY * height / 2f, Color.White, MathF.PI * 3f / 2f);
+                    break;
+                
+                case Edges.East:
+                    level.ParticlesFG.Emit(Strawberry.P_WingsBurst, (int) height, new Vector2(edge.End.X, centerV), Vector2.UnitY * height / 2f, Color.White, MathF.PI / 2f);
+                    break;
+                
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
         }
     }
 
     private void SpawnSlowRoutineParticles()
     {
-        if (MasterOfGroup)
-        {
-            Level level = SceneAs<Level>();
-            Camera camera = level.Camera;
+        if (!MasterOfGroup)
+            return;
+        
+        Level level = SceneAs<Level>();
+        Camera camera = level.Camera;
 
-            float whiteHeight = baseData.Get<float>("whiteHeight");
-            float whiteFillBottom = GroupRect.Y + (GroupRect.Height * whiteHeight);
-
-            foreach (ConnectedDreamBlock block in Group)
-            {
-                if (block.Right < camera.Left || block.Left > camera.Right || block.Bottom < camera.Top || block.Top > camera.Bottom)
-                    continue;
-
-                if (block.Top <= whiteFillBottom && block.Bottom >= whiteFillBottom)
-                {
-                    for (int i = 0; i < block.Width; i += 4)
-                        level.ParticlesFG.Emit(Strawberry.P_WingsBurst, new Vector2(block.X + i, whiteFillBottom + 1f));
-                }
-            }
-        }
+        float whiteFillBottom = groupRect.Y + groupRect.Height * whiteHeight;
+        foreach (ConnectedDreamBlock block in Group.Where(block =>
+                                                       !(block.Right < camera.Left)
+                                                       && !(block.Left > camera.Right)
+                                                       && !(block.Bottom < camera.Top)
+                                                       && !(block.Top > camera.Bottom))
+                                                   .Where(block => block.Top <= whiteFillBottom
+                                                       && block.Bottom >= whiteFillBottom))
+            for (int i = 0; i < block.Width; i += 4)
+                level.ParticlesFG.Emit(Strawberry.P_WingsBurst, new Vector2(block.X + i, whiteFillBottom + 1f));
     }
 
     private bool TileHasGroupDreamBlock(int x, int y)
     {
         Rectangle rect = TileToRectangle(x, y);
-        rect.Offset((int) GroupBoundsMin.X, (int) GroupBoundsMin.Y);
-        foreach (ConnectedDreamBlock block in Group)
-        {
-            if (block.CollideRect(rect))
-                return true;
-        }
-
-        return false;
+        rect.Offset((int) groupBoundsMin.X, (int) groupBoundsMin.Y);
+        return Group.Any(block => block.CollideRect(rect));
     }
 
     private static Rectangle TileToRectangle(int x, int y)
@@ -687,33 +640,32 @@ public class ConnectedDreamBlock : CustomDreamBlock
     private static Vector2 TileToPoint(int x, int y)
         => new(x * 8, y * 8);
 
-    public void ConnectedFootstepRipple(Vector2 position)
+    private void ConnectedFootstepRipple(Vector2 position)
     {
-        if (PlayerHasDreamDash)
-        {
-            ConnectedDreamBlock master = MasterOfGroup ? this : this.master;
+        if (!PlayerHasDreamDash)
+            return;
+        ConnectedDreamBlock groupMaster = MasterOfGroup ? this : Master;
 
-            foreach (ConnectedDreamBlock block in master.Group)
-            {
-                DisplacementRenderer.Burst burst = (Scene as Level).Displacement.AddBurst(position, 0.5f, 0f, 40f);
-                burst.WorldClipCollider = block.Collider;
-                burst.WorldClipPadding = 1;
-            }
+        foreach (ConnectedDreamBlock block in groupMaster.Group)
+        {
+            DisplacementRenderer.Burst burst = SceneAs<Level>().Displacement.AddBurst(position, 0.5f, 0f, 40f);
+            burst.WorldClipCollider = block.Collider;
+            burst.WorldClipPadding = 1;
         }
     }
 
-    public override void BeginShatter()
+    protected override void BeginShatter()
     {
-        if (ShatterCheck())
-        {
-            Audio.Play(CustomSFX.game_connectedDreamBlock_dreamblock_shatter, Position);
+        if (!ShatterCheck())
+            return;
+        
+        Audio.Play(CustomSFX.game_connectedDreamBlock_dreamblock_shatter, Position);
 
-            ConnectedDreamBlock master = MasterOfGroup ? this : this.master;
-            foreach (ConnectedDreamBlock block in master.Group)
-            {
-                block.shattering = true;
-                block.Add(new Coroutine(block.ShatterSequence()));
-            }
+        ConnectedDreamBlock groupMaster = MasterOfGroup ? this : Master;
+        foreach (ConnectedDreamBlock block in groupMaster.Group)
+        {
+            block.Shattering = true;
+            block.Add(new Coroutine(block.ShatterSequence()));
         }
     }
 
@@ -743,38 +695,30 @@ public class ConnectedDreamBlock : CustomDreamBlock
             Level level = SceneAs<Level>();
             level.Shake(.65f);
             Vector2 camera = level.Camera.Position;
-            Rectangle GroupRect = new(
-                (int) GroupBoundsMin.X,
-                (int) GroupBoundsMin.Y,
-                (int) (GroupBoundsMax.X - GroupBoundsMin.X),
-                (int) (GroupBoundsMax.Y - GroupBoundsMin.Y));
+            Rectangle rect = new(
+                (int) groupBoundsMin.X,
+                (int) groupBoundsMin.Y,
+                (int) (groupBoundsMax.X - groupBoundsMin.X),
+                (int) (groupBoundsMax.Y - groupBoundsMin.Y));
 
-            Vector2 centre = new(GroupRect.Center.X, GroupRect.Center.Y);
-            for (int i = 0; i < particles.Length; i++)
+            Vector2 centre = new(rect.Center.X, rect.Center.Y);
+            for (int i = 0; i < Particles.Length; i++)
             {
-                Vector2 position = particles[i].Position;
-                position += camera * (0.3f + (0.25f * particles[i].Layer));
-                position = PutInside(position, GroupRect);
-                bool inside = false;
-                foreach (ConnectedDreamBlock block in Group)
-                {
-                    if (block.CollidePoint(position))
-                    {
-                        inside = true;
-                        break;
-                    }
-                }
+                Vector2 position = Particles[i].Position;
+                position += camera * (0.3f + 0.25f * Particles[i].Layer);
+                position = PutInside(position, rect);
+                bool inside = Group.Any(block => block.CollidePoint(position));
                 if (!inside)
                     continue;
 
-                Color flickerColor = Color.Lerp(particles[i].Color, Color.White, 0.6f);
+                Color flickerColor = Color.Lerp(Particles[i].Color, Color.White, 0.6f);
                 ParticleType type = new(Lightning.P_Shatter)
                 {
                     ColorMode = ParticleType.ColorModes.Fade,
-                    Color = particles[i].Color,
-                    Color2 = flickerColor, //Color.Lerp(particles[i].Color, Color.White, 0.5f),
-                    Source = FeatherMode ? featherTextures[particles[i].Layer] : baseData.Get<MTexture[]>("particleTextures")[2],
-                    SpinMax = FeatherMode ? (float) Math.PI : 0,
+                    Color = Particles[i].Color,
+                    Color2 = flickerColor,
+                    Source = FeatherMode ? FeatherTextures[Particles[i].Layer] : particleTextures[2],
+                    SpinMax = FeatherMode ? MathF.PI : 0,
                     RotationMode = FeatherMode ? ParticleType.RotationModes.Random : ParticleType.RotationModes.None,
                     Direction = (position - centre).Angle()
                 };
@@ -823,7 +767,7 @@ public class ConnectedDreamBlock : CustomDreamBlock
 
     private static FieldInfo f_DreamBlock_Routine_this;
 
-    public static void Hook()
+    public static void Load()
     {
         On.Celeste.DreamBlock.FootstepRipple += DreamBlock_FootstepRipple;
 
@@ -845,7 +789,7 @@ public class ConnectedDreamBlock : CustomDreamBlock
         hook_DreamBlock_Deactivate = new ILHook(nestedType.GetMethod("MoveNext", BindingFlags.NonPublic | BindingFlags.Instance), DreamBlockSlowRoutine);
     }
 
-    public static void Unhook()
+    public static void Unload()
     {
         On.Celeste.DreamBlock.FootstepRipple -= DreamBlock_FootstepRipple;
 
@@ -858,6 +802,7 @@ public class ConnectedDreamBlock : CustomDreamBlock
     private static void DreamBlockSlowRoutine(ILContext il)
     {
         ILCursor cursor = new(il);
+        
         cursor.GotoNext(instr => instr.OpCode == OpCodes.Ldfld && ((FieldReference) instr.Operand).Name.Contains("level"));
         cursor.GotoNext(MoveType.After, instr => instr.OpCode.ToShortOp() == OpCodes.Brfalse_S);
         object breakTarget = cursor.Prev.Operand;
@@ -868,12 +813,11 @@ public class ConnectedDreamBlock : CustomDreamBlock
 
         cursor.EmitDelegate<Func<DreamBlock, bool>>(block =>
         {
-            if (block is ConnectedDreamBlock connected)
-            {
-                connected.SpawnSlowRoutineParticles();
-                return true;
-            }
-            return false;
+            if (block is not ConnectedDreamBlock connected)
+                return false;
+            
+            connected.SpawnSlowRoutineParticles();
+            return true;
         });
 
         // Skip regular particles;
@@ -883,6 +827,7 @@ public class ConnectedDreamBlock : CustomDreamBlock
     private static void DreamBlockFastRoutine(ILContext il)
     {
         ILCursor cursor = new(il);
+        
         cursor.GotoNext(instr => instr.Next.OpCode == OpCodes.Ldfld && ((FieldReference) instr.Next.Operand).Name.Contains("level"));
 
         // Load DreamBlock object
@@ -891,28 +836,23 @@ public class ConnectedDreamBlock : CustomDreamBlock
 
         cursor.EmitDelegate<Func<DreamBlock, bool>>(block =>
         {
-            if (block is ConnectedDreamBlock connected)
-            {
-                connected.SpawnFastRoutineParticles();
-                return true;
-            }
-            return false;
+            if (block is not ConnectedDreamBlock connected)
+                return false;
+            
+            connected.SpawnFastRoutineParticles();
+            return true;
         });
 
         // Skip regular particles
-        cursor.Emit(OpCodes.Brtrue, il.Instrs.Last(instr => instr.Previous?.OpCode == OpCodes.Callvirt && ((MethodReference) instr.Previous?.Operand).Name == "Emit"));
+        cursor.Emit(OpCodes.Brtrue, il.Instrs.Last(instr => instr.Previous?.OpCode == OpCodes.Callvirt && ((MethodReference) instr.Previous?.Operand)!.Name == "Emit"));
     }
 
     private static void DreamBlock_FootstepRipple(On.Celeste.DreamBlock.orig_FootstepRipple orig, DreamBlock dreamBlock, Vector2 pos)
     {
         if (dreamBlock is ConnectedDreamBlock connectedBlock)
-        {
             connectedBlock.ConnectedFootstepRipple(pos);
-        }
         else
-        {
             orig(dreamBlock, pos);
-        }
     }
 
     #endregion

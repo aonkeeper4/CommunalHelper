@@ -341,7 +341,7 @@ public class DreamMoveBlock : CustomDreamBlock
                     crashResetTimer = CrashResetTime;
                     if (crashStartShakingTimer < 0f && shakeOnCollision)
                         StartShaking();
-                    if (!(crashTimer > 0f) && !shattering)
+                    if (!(crashTimer > 0f) && !Shattering)
                     {
                         break;
                     }
@@ -469,7 +469,7 @@ public class DreamMoveBlock : CustomDreamBlock
         }
     }
 
-    public override void BeginShatter()
+    protected override void BeginShatter()
     {
         if (groupable.State != GroupableMoveBlock.MovementState.Breaking)
             base.BeginShatter();
@@ -483,7 +483,7 @@ public class DreamMoveBlock : CustomDreamBlock
         moveSfx.Stop();
     }
 
-    public override void SetupCustomParticles(float canvasWidth, float canvasHeight)
+    protected override void SetupCustomParticles(float canvasWidth, float canvasHeight)
     {
         base.SetupCustomParticles(canvasWidth, canvasHeight);
         if (PlayerHasDreamDash)
@@ -685,7 +685,7 @@ public class DreamMoveBlock : CustomDreamBlock
         MTexture currentTex = groupable.State != GroupableMoveBlock.MovementState.Breaking
             ? arrows[Calc.Clamp(value, 0, 7)]
             : GFX.Game["objects/CommunalHelper/dreamMoveBlock/x"];
-        currentTex.DrawCentered(Center + baseData.Get<Vector2>("shake"), groupable.HighlightColor(currentArrowColor));
+        currentTex.DrawCentered(Center + shake, groupable.HighlightColor(currentArrowColor));
 
         float num = flash * 4f;
         Draw.Rect(X - num, Y - num, Width + (num * 2f), Height + (num * 2f), Color.White * flash);
@@ -703,15 +703,15 @@ public class DreamMoveBlock : CustomDreamBlock
         {
             if (canSteer)
             {
-                topWobble = false;
+                TopWobble = false;
             }
         }
         else if (direction == MoveBlock.Directions.Up || direction == MoveBlock.Directions.Down)
         {
             if (canSteer)
             {
-                leftWobble = false;
-                rightWobble = false;
+                LeftWobble = false;
+                RightWobble = false;
             }
         }
         if (groupable.State == GroupableMoveBlock.MovementState.Idling)
@@ -726,10 +726,10 @@ public class DreamMoveBlock : CustomDreamBlock
         }
         else if (groupable.State == GroupableMoveBlock.MovementState.Breaking && canSteer)
         {
-            topWobble = true;
-            bottomWobble = true;
-            leftWobble = true;
-            rightWobble = true;
+            TopWobble = true;
+            BottomWobble = true;
+            LeftWobble = true;
+            RightWobble = true;
             wobbleLineColor = breakingWobbleLinesColor;
         }
 

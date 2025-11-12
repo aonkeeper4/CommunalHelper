@@ -126,6 +126,7 @@ public class CommunalHelperModule : EverestModule
         typeof(Imports.GravityHelper).ModInterop();
         typeof(Imports.ReverseHelper).ModInterop();
         typeof(Imports.LylyraHelper).ModInterop();
+        typeof(Imports.PandorasBox.DreamDashController).ModInterop();
 
         #endregion
 
@@ -266,6 +267,8 @@ public class CommunalHelperModule : EverestModule
         Imports.SpeedrunTool.Initialize();
 
         AeroBlockCharged.SpirialisHelperLoaded = Everest.Loader.DependencyLoaded(new EverestModuleMetadata() { Name = "SpirialisHelper", Version = new Version(1, 0, 8) });
+
+        Imports.PandorasBox.Initialize();
     }
 
     public override void LoadContent(bool firstLoad)

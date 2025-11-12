@@ -13,7 +13,7 @@ public class DreamBlockDummy : DreamBlock
 {
     public Entity Entity;
 
-    public bool PlayerHasDreamDash => Data.Get<bool>("playerHasDreamDash");
+    public bool PlayerHasDreamDash => data.Get<bool>("playerHasDreamDash");
 
     public Func<IEnumerator> OnActivate;
     public Func<IEnumerator> OnFastActivate;
@@ -25,30 +25,31 @@ public class DreamBlockDummy : DreamBlock
 
     public Action OnSetup;
 
-    public DynamicData Data;
+    private readonly DynamicData data;
 
     public DreamBlockDummy(Entity entity)
-        : base(Vector2.Zero, 0, 0, null, false, false)
+        : base(entity.Position, entity.Width, entity.Height, null, false, false)
     {
         Collidable = Active = Visible = false;
         Entity = entity;
 
-        Data = new(typeof(DreamBlock), this);
+        data = new DynamicData(typeof(DreamBlock), this);
     }
 
     [MonoModLinkTo("Monocle.Entity", "System.Void Added(Monocle.Scene)")]
-    public void base_Added(Scene scene)
-    {
-        base.Added(scene);
-    }
+    private extern void base_Added(Scene scene);
 
     public override void Added(Scene scene)
     {
         base_Added(scene);
-        Data.Set("playerHasDreamDash", SceneAs<Level>().Session.Inventory.DreamDash);
+        
+        data.Set("playerHasDreamDash", SceneAs<Level>().Session.Inventory.DreamDash);
     }
 
-    public override void Update() { }
+    public override void Update()
+    {
+        Position = Entity.Position;
+    }
 
     public override void Render() { }
 
@@ -82,80 +83,78 @@ public class DreamBlockDummy : DreamBlock
 
     private static IEnumerator DreamBlock_Activate(On.Celeste.DreamBlock.orig_Activate orig, DreamBlock self)
     {
-        if (self is DreamBlockDummy dummy && dummy.OnActivate is not null)
-        {
-            dummy.Data.Set("playerHasDreamDash", true);
-            dummy.Entity.Add(new Coroutine(dummy.OnActivate()));
-            return null;
-        }
-        return orig(self);
+        if (self is not DreamBlockDummy dummy || dummy.OnActivate is null)
+            return orig(self);
+        
+        dummy.data.Set("playerHasDreamDash", true);
+        dummy.Entity.Add(new Coroutine(dummy.OnActivate()));
+        return null;
     }
 
     private static IEnumerator DreamBlock_FastActivate(On.Celeste.DreamBlock.orig_FastActivate orig, DreamBlock self)
     {
-        if (self is DreamBlockDummy dummy && dummy.OnFastActivate is not null)
-        {
-            dummy.Data.Set("playerHasDreamDash", true);
-            dummy.Entity.Add(new Coroutine(dummy.OnFastActivate()));
-            return null;
-        }
-        return orig(self);
+        if (self is not DreamBlockDummy dummy || dummy.OnFastActivate is null)
+            return orig(self);
+        
+        dummy.data.Set("playerHasDreamDash", true);
+        dummy.Entity.Add(new Coroutine(dummy.OnFastActivate()));
+        return null;
     }
 
     private static void DreamBlock_ActivateNoRoutine(On.Celeste.DreamBlock.orig_ActivateNoRoutine orig, DreamBlock self)
     {
-        if (self is DreamBlockDummy dummy && dummy.OnActivateNoRoutine is not null)
+        if (self is not DreamBlockDummy dummy || dummy.OnActivateNoRoutine is null)
         {
-            dummy.Data.Set("playerHasDreamDash", true);
-            dummy.OnActivateNoRoutine();
+            orig(self);
             return;
         }
-        orig(self);
+        
+        dummy.data.Set("playerHasDreamDash", true);
+        dummy.OnActivateNoRoutine();
     }
 
     private static IEnumerator DreamBlock_Deactivate(On.Celeste.DreamBlock.orig_Deactivate orig, DreamBlock self)
     {
-        if (self is DreamBlockDummy dummy && dummy.OnDeactivate is not null)
-        {
-            dummy.Data.Set("playerHasDreamDash", false);
-            dummy.Entity.Add(new Coroutine(dummy.OnDeactivate()));
-            return null;
-        }
-        return orig(self);
+        if (self is not DreamBlockDummy dummy || dummy.OnDeactivate is null)
+            return orig(self);
+        
+        dummy.data.Set("playerHasDreamDash", false);
+        dummy.Entity.Add(new Coroutine(dummy.OnDeactivate()));
+        return null;
     }
 
     private static IEnumerator DreamBlock_FastDeactivate(On.Celeste.DreamBlock.orig_FastDeactivate orig, DreamBlock self)
     {
-        if (self is DreamBlockDummy dummy && dummy.OnFastDeactivate is not null)
-        {
-            dummy.Data.Set("playerHasDreamDash", false);
-            dummy.Entity.Add(new Coroutine(dummy.OnFastDeactivate()));
-            return null;
-        }
-        return orig(self);
+        if (self is not DreamBlockDummy dummy || dummy.OnFastDeactivate is null)
+            return orig(self);
+        
+        dummy.data.Set("playerHasDreamDash", false);
+        dummy.Entity.Add(new Coroutine(dummy.OnFastDeactivate()));
+        return null;
     }
 
     private static void DreamBlock_DeactivateNoRoutine(On.Celeste.DreamBlock.orig_DeactivateNoRoutine orig, DreamBlock self)
     {
-        if (self is DreamBlockDummy dummy && dummy.OnDeactivateNoRoutine is not null)
+        if (self is not DreamBlockDummy dummy || dummy.OnDeactivateNoRoutine is null)
         {
-            dummy.Data.Set("playerHasDreamDash", false);
-            dummy.OnDeactivateNoRoutine();
+            orig(self);
             return;
         }
-        orig(self);
+        
+        dummy.data.Set("playerHasDreamDash", false);
+        dummy.OnDeactivateNoRoutine();
     }
 
     private static void DreamBlock_Setup(On.Celeste.DreamBlock.orig_Setup orig, DreamBlock self)
     {
-        if (self is DreamBlockDummy dummy && dummy.OnSetup is not null)
+        if (self is DreamBlockDummy { OnSetup: not null } dummy)
         {
             dummy.OnSetup();
             return;
         }
+        
         orig(self);
     }
 
     #endregion
-
 }

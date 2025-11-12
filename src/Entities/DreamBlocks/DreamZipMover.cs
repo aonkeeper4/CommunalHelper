@@ -1,4 +1,5 @@
 ﻿using System.Collections;
+using System.Collections.Generic;
 
 namespace Celeste.Mod.CommunalHelper.Entities;
 
@@ -188,8 +189,12 @@ public class DreamZipMover : CustomDreamBlock
             if (!cameraBounds.Intersects(bounds))
                 return;
 
-            Color dreamRopeColor = zipMover.PlayerHasDreamDash ? ActiveLineColor : DisabledLineColor;
-            Color color = Color.Lerp(zipMover.dreamAesthetic ? dreamRopeColor : zipMover.ropeColor, ActiveLineColor, zipMover.ColorLerp);
+            (_, _, Color? controllerActiveLineColor, Color? controllerDisabledLineColor, _) = Imports.PandorasBox.GetVisualSettingsFor(this);
+            Color activeLineColor = controllerActiveLineColor ?? DreamBlock.activeLineColor;
+            Color disabledLineColor = controllerDisabledLineColor ?? DreamBlock.disabledLineColor;
+
+            Color dreamRopeColor = zipMover.PlayerHasDreamDash ? activeLineColor : disabledLineColor;
+            Color color = Color.Lerp(zipMover.dreamAesthetic ? dreamRopeColor : zipMover.ropeColor, activeLineColor, zipMover.ColorLerp);
 
             foreach (Segment seg in segments)
                 if (seg.Seen = cameraBounds.Intersects(seg.Bounds))
@@ -204,7 +209,7 @@ public class DreamZipMover : CustomDreamBlock
             {
                 zipMover.cog.DrawCentered(node + Vector2.UnitY, Color.Black, 1f, rotation);
                 if (zipMover.ColorLerp > 0f)
-                    cogWhite.DrawCentered(node, Color.Lerp(Color.Transparent, ActiveLineColor, zipMover.ColorLerp), 1f, rotation);
+                    cogWhite.DrawCentered(node, Color.Lerp(Color.Transparent, activeLineColor, zipMover.ColorLerp), 1f, rotation);
                 else
                     zipMover.cog.DrawCentered(node, Color.White, 1f, rotation);
             }
@@ -306,7 +311,7 @@ public class DreamZipMover : CustomDreamBlock
         base.Render();
 
         if (noReturn)
-            cross.DrawCentered(Center + baseData.Get<Vector2>("shake"));
+            cross.DrawCentered(Center + shake);
 
         Position = position;
     }

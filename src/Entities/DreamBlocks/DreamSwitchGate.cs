@@ -154,9 +154,8 @@ public class DreamSwitchGate : CustomDreamBlock
         icon.Render();
 
         // Redraw whiteFill over icon
-        float whiteFill = baseData.Get<float>("whiteFill");
         if (whiteFill > 0)
-            Draw.Rect(Position, Width, Height * baseData.Get<float>("whiteHeight"), Color.White * whiteFill);
+            Draw.Rect(Position, Width, Height * whiteHeight, Color.White * whiteFill);
 
         Position = position;
     }
@@ -530,7 +529,7 @@ public class DreamSwitchGate : CustomDreamBlock
         }
     }
 
-    public override void SetupCustomParticles(float canvasWidth, float canvasHeight)
+    protected override void SetupCustomParticles(float canvasWidth, float canvasHeight)
     {
         base.SetupCustomParticles(canvasWidth, canvasHeight);
         if (PlayerHasDreamDash)

@@ -343,11 +343,12 @@ public class DreamTunnelEntry : AbstractPanel
         Vector2 vector = Vector2.Normalize(to - from);
         Vector2 perp = new(vector.Y, -vector.X);
 
-        (Color? controllerActiveBackColor,
-            Color? controllerDisabledBackColor,
-            Color? controllerActiveLineColor,
-            Color? controllerDisabledLineColor,
-            _) = Imports.PandorasBox.GetVisualSettingsFor(this);
+        Imports.PandorasBox.GetVisualSettingsFor(this,
+            out Color? controllerActiveBackColor,
+            out Color? controllerDisabledBackColor,
+            out Color? controllerActiveLineColor,
+            out Color? controllerDisabledLineColor,
+            out _, out _);
 
         Color backColor = PlayerHasDreamDash
             ? controllerActiveBackColor ?? DreamBlock.activeBackColor
@@ -397,7 +398,7 @@ public class DreamTunnelEntry : AbstractPanel
     {
         particles = new DreamParticle[(int) (Width / 4f * (Height / 4f) * 0.5f)];
 
-        (_, _, _, _, List<List<Color>> particleLayerColors) = Imports.PandorasBox.GetVisualSettingsFor(this);
+        Imports.PandorasBox.GetVisualSettingsFor(this, out _, out _, out _, out _, out Color[][] activeParticleLayerColors, out Color[][] disabledParticleLayerColors);
         
         for (int i = 0; i < particles.Length; i++)
         {
@@ -405,8 +406,8 @@ public class DreamTunnelEntry : AbstractPanel
             particles[i].Layer = Calc.Random.Choose(0, 1, 1, 2, 2, 2);
             particles[i].TimeOffset = Calc.Random.NextFloat();
             particles[i].Color = PlayerHasDreamDash
-                ? particleLayerColors is not null
-                    ? Calc.Random.Choose(particleLayerColors[particles[i].Layer])
+                ? activeParticleLayerColors is not null
+                    ? Calc.Random.Choose(activeParticleLayerColors[particles[i].Layer])
                     : particles[i].Layer switch
                     {
                         0 => Calc.Random.Choose(CustomDreamBlock.DreamColors[0], CustomDreamBlock.DreamColors[1], CustomDreamBlock.DreamColors[2]),
@@ -414,7 +415,9 @@ public class DreamTunnelEntry : AbstractPanel
                         2 => Calc.Random.Choose(CustomDreamBlock.DreamColors[6], CustomDreamBlock.DreamColors[7], CustomDreamBlock.DreamColors[8]),
                         _ => throw new NotImplementedException()
                     }
-                : Color.LightGray * (0.5f + particles[i].Layer / 2f * 0.5f);
+                : disabledParticleLayerColors is not null
+                    ? Calc.Random.Choose(disabledParticleLayerColors[particles[i].Layer])
+                    : Color.LightGray * (0.5f + particles[i].Layer / 2f * 0.5f);
         }
     }
 
@@ -474,8 +477,8 @@ public class DreamTunnelEntry : AbstractPanel
 
     #region Hooks
 
-    private static IDetour hook_Player_DashCoroutine;
-    private static IDetour hook_Player_orig_WallJump;
+    private static ILHook hook_Player_DashCoroutine;
+    private static ILHook hook_Player_orig_WallJump;
 
     internal static new void Load()
     {

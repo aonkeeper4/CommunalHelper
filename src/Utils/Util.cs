@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 
 namespace Celeste.Mod.CommunalHelper;
@@ -317,5 +318,44 @@ public static class Util
             middle.RenderPosition = pos + new Vector2(width / 2f, height / 2f);
             middle.Render();
         }
+    }
+    
+    public static (T[], int[]) PackArray<T>(T[][] toPack)
+    {
+        int[] startingIndices = new int[toPack.Length];
+        int sum = 0;
+        for (int i = 0; i < toPack.Length; i++)
+        {
+            startingIndices[i] = sum;
+            sum += toPack[i].Length;
+        }
+
+        T[] result = new T[sum];
+        int index = 0;
+        foreach (T[] array in toPack)
+        foreach (T element in array)
+        {
+            result[index] = element;
+            index++;
+        }
+
+        return (result, startingIndices);
+    }
+
+    public static T[][] UnpackArray<T>(T[] packed, int[] startingIndices)
+    {
+        T[][] result = new T[startingIndices.Length][];
+
+        for (int i = 0; i < startingIndices.Length; i++)
+        {
+            int startingIndex = startingIndices[i];
+            int endingIndex = i == startingIndices.Length - 1 ? packed.Length : startingIndices[i + 1];
+
+            result[i] = new T[endingIndex - startingIndex];
+            for (int j = startingIndex; j < endingIndex; j++)
+                result[i][j - startingIndex] = packed[j];
+        }
+
+        return result;
     }
 }

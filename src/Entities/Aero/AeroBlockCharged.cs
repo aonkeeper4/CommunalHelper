@@ -352,7 +352,8 @@ public class AeroBlockCharged : AeroBlockFlying
 
     internal static void Load()
     {
-        using (new DetourContext { After = { "*" } })
+        // equivalent to `new DetourContextConfig { After = { "*" } }`
+        using (new DetourConfigContext(new DetourConfig(nameof(CommunalHelper), int.MinValue)).Use())
         {
             On.Celeste.Player.Jump += Player_Jump;
             On.Celeste.Player.WallJump += Player_WallJump;

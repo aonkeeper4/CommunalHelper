@@ -18,8 +18,28 @@ public static class PandorasBox
         public static Action<List<Type>> AddControlledTypes;
         public static Action<List<Type>> RemoveControlledTypes;
 
-        public static Func<Entity, (bool?, bool?, bool?, bool?, bool?, bool?, bool?, float?, float?)> GetGameplaySettingsFor;
-        public static Func<Entity, (Color?, Color?, Color?, Color?, List<List<Color>>)> GetVisualSettingsFor;
+        public delegate void GetGameplaySettingsForDelegate(Entity entity,
+            out bool? allowSameDirectionDash,
+            out bool? allowDreamDashRedirection,
+            out bool? overrideDreamDashSpeed,
+            out bool? neverSlowDown,
+            out bool? useEntrySpeedAngle,
+            out bool? bounceOnCollision,
+            out bool? collideStickToWalls,
+            out float? sameDirectionSpeedMultiplier,
+            out float? dreamDashSpeed);
+        public static GetGameplaySettingsForDelegate GetGameplaySettingsFor;
+
+        public delegate void GetVisualSettingsForDelegate(Entity entity,
+            out Color? activeBackColor,
+            out Color? disabledBackColor,
+            out Color? activeLineColor,
+            out Color? disabledLineColor,
+            out Color[] activeParticleLayerColors,
+            out int[] activeParticleLayerIndices,
+            out Color[] disabledParticleLayerColors,
+            out int[] disabledParticleLayerIndices);
+        public static GetVisualSettingsForDelegate GetVisualSettingsFor;
     }
     
     public static void AddSetupIgnoringTypes(List<Type> types)
@@ -32,10 +52,70 @@ public static class PandorasBox
     public static void RemoveControlledTypes(List<Type> types)
         => DreamDashController.RemoveControlledTypes?.Invoke(types);
 
-    public static (bool?, bool?, bool?, bool?, bool?, bool?, bool?, float?, float?) GetGameplaySettingsFor(Entity entity)
-        => DreamDashController.GetGameplaySettingsFor?.Invoke(entity) ?? default;
-    public static (Color?, Color?, Color?, Color?, List<List<Color>>) GetVisualSettingsFor(Entity entity)
-        => DreamDashController.GetVisualSettingsFor?.Invoke(entity) ?? default;
+    public static void GetGameplaySettingsFor(Entity entity,
+        out bool? allowSameDirectionDash,
+        out bool? allowDreamDashRedirection,
+        out bool? overrideDreamDashSpeed,
+        out bool? neverSlowDown,
+        out bool? useEntrySpeedAngle,
+        out bool? bounceOnCollision,
+        out bool? collideStickToWalls,
+        out float? sameDirectionSpeedMultiplier,
+        out float? dreamDashSpeed)
+    {
+        allowSameDirectionDash = null;
+        allowDreamDashRedirection = null;
+        overrideDreamDashSpeed = null;
+        neverSlowDown = null;
+        useEntrySpeedAngle = null;
+        bounceOnCollision = null;
+        collideStickToWalls = null;
+        sameDirectionSpeedMultiplier = null;
+        dreamDashSpeed = null;
+        
+        DreamDashController.GetGameplaySettingsFor?.Invoke(entity,
+            out allowSameDirectionDash,
+            out allowDreamDashRedirection,
+            out overrideDreamDashSpeed,
+            out neverSlowDown,
+            out useEntrySpeedAngle,
+            out bounceOnCollision,
+            out collideStickToWalls,
+            out sameDirectionSpeedMultiplier,
+            out dreamDashSpeed);
+    }
+
+    public static void GetVisualSettingsFor(Entity entity,
+        out Color? activeBackColor,
+        out Color? disabledBackColor,
+        out Color? activeLineColor,
+        out Color? disabledLineColor,
+        out Color[][] activeParticleLayerColors,
+        out Color[][] disabledParticleLayerColors)
+    {
+        activeBackColor = null;
+        disabledBackColor = null;
+        activeLineColor = null;
+        disabledLineColor = null;
+        activeParticleLayerColors = null;
+        disabledParticleLayerColors = null;
+               
+        if (DreamDashController.GetVisualSettingsFor is null)
+            return;
+        
+        DreamDashController.GetVisualSettingsFor(entity,
+            out activeBackColor,
+            out disabledBackColor,
+            out activeLineColor,
+            out disabledLineColor,
+            out Color[] packedActiveParticleLayerColors,
+            out int[] activeParticleLayerIndices,
+            out Color[] packedDisabledParticleLayerColors,
+            out int[] disabledParticleLayerIndices);
+
+        activeParticleLayerColors = Util.UnpackArray(packedActiveParticleLayerColors, activeParticleLayerIndices);
+        disabledParticleLayerColors = Util.UnpackArray(packedDisabledParticleLayerColors, disabledParticleLayerIndices);
+    }
     
     #endregion
     

@@ -155,8 +155,8 @@ public abstract class AbstractPanel : Entity
 
     #region Hooks
 
-    private static readonly List<IDetour> hook_Platform_GetLandOrStepSoundIndex = new();
-    private static readonly List<IDetour> hook_Platform_GetWallSoundIndex = new();
+    private static readonly List<Hook> hook_Platform_GetLandOrStepSoundIndex = new();
+    private static readonly List<Hook> hook_Platform_GetWallSoundIndex = new();
 
     internal static void Load()
     {

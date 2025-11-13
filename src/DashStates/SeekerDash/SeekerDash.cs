@@ -34,7 +34,7 @@ public static class SeekerDash
     private static readonly MethodInfo m_Seeker_GotBouncedOn = typeof(Seeker).GetMethod("GotBouncedOn", BindingFlags.NonPublic | BindingFlags.Instance);
     private static readonly FieldInfo f_Seeker_dead = typeof(Seeker).GetField("dead", BindingFlags.NonPublic | BindingFlags.Instance);
 
-    private static IDetour hook_Player_get_CanDash;
+    private static Hook hook_Player_get_CanDash;
 
     internal static void Load()
     {

@@ -7,7 +7,11 @@ using System.Reflection;
 namespace Celeste.Mod.CommunalHelper.Components;
 
 public class DreamSprite : Sprite {
-    internal class DreamSpriteMarker(Vector2 position) : Entity(position);
+    internal class DreamSpriteMarker(Entity parent) : Entity(parent.Position)
+    {
+        public override void Update()
+            => Position = parent.Position;
+    }
     internal DreamSpriteMarker Marker;
 
     public readonly Rectangle ParticleBounds;
@@ -53,7 +57,7 @@ public class DreamSprite : Sprite {
         base.EntityAdded(scene);
         
         TrackSelf();
-        Scene.Add(Marker = new DreamSpriteMarker(Entity.Position));
+        Scene.Add(Marker = new DreamSpriteMarker(Entity));
     }
 
     public override void EntityAwake()
@@ -62,25 +66,25 @@ public class DreamSprite : Sprite {
         
         Particles = new DreamParticle[(int)((ParticleBounds.Width / 8f) * (ParticleBounds.Height / 8f) * 0.7f)];
 
-        (_, _, _, _, List<List<Color>> particleLayerColors) = Imports.PandorasBox.GetVisualSettingsFor(Marker);
+        Imports.PandorasBox.GetVisualSettingsFor(Marker, out _, out _, out _, out _, out Color[][] activeParticleLayerColors, out Color[][] disabledParticleLayerColors);
         
         for (int i = 0; i < Particles.Length; i++) {
             Particles[i].Position = new Vector2(Calc.Random.NextFloat(ParticleBounds.Width), Calc.Random.NextFloat(ParticleBounds.Height));
             Particles[i].Layer = Calc.Random.Choose(0, 1, 1, 2, 2, 2);
             Particles[i].TimeOffset = Calc.Random.NextFloat();
 
-            Particles[i].DisabledColor = Color.LightGray * (0.5f + Particles[i].Layer / 2f * 0.5f);
-            Particles[i].DisabledColor.A = 255;
-
-            Particles[i].EnabledColor = particleLayerColors is not null
-                ? Calc.Random.Choose(particleLayerColors[Particles[i].Layer])
+            Particles[i].DisabledColor = disabledParticleLayerColors is not null
+                ? Calc.Random.Choose(disabledParticleLayerColors[Particles[i].Layer])
+                : Color.LightGray * (0.5f + Particles[i].Layer / 2f * 0.5f);
+            Particles[i].EnabledColor = activeParticleLayerColors is not null
+                ? Calc.Random.Choose(activeParticleLayerColors[Particles[i].Layer])
                 : Particles[i].Layer switch
-            {
-                0 => Calc.Random.Choose(ParticleColors[0], ParticleColors[1], ParticleColors[2]),
-                1 => Calc.Random.Choose(ParticleColors[3], ParticleColors[4], ParticleColors[5]),
-                2 => Calc.Random.Choose(ParticleColors[6], ParticleColors[7], ParticleColors[8]),
-                _ => throw new NotImplementedException()
-            };
+                {
+                    0 => Calc.Random.Choose(ParticleColors[0], ParticleColors[1], ParticleColors[2]),
+                    1 => Calc.Random.Choose(ParticleColors[3], ParticleColors[4], ParticleColors[5]),
+                    2 => Calc.Random.Choose(ParticleColors[6], ParticleColors[7], ParticleColors[8]),
+                    _ => throw new NotImplementedException()
+                };
         }
     }
 

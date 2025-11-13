@@ -20,22 +20,17 @@
 
 	<!--Include MonoMod and MonoMod.RuntimeDetour-->
 	<ItemGroup>
-		<PackageReference Include="Mono.Cecil" Version="0.11.6" />
-		<PackageReference Include="MonoMod" Version="22.01.04.03" />
-		<PackageReference Include="MonoMod.RuntimeDetour" Version="22.01.04.03">
-			<IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-		</PackageReference>
-		<PackageReference Include="CelesteMod.Publicizer" Version="*" CelesteAssembly="$(CelestePrefix)\Celeste.dll" />
+		<PackageReference Include="MonoMod.RuntimeDetour" Version="25.3.1" PrivateAssets="all" ExcludeAssets="runtime" />
+		<PackageReference Include="MonoMod.Patcher" Version="25.0.0-prerelease.2" />
+		<PackageReference Include="CelesteAnalyzer" Version="*" />
 	</ItemGroup>
 
 	<!--Include Celeste.dll, MMHOOK_Celeste.dll and FNA.dll-->
 	<ItemGroup>
-		<Reference Include="$(CelestePrefix)\MMHOOK_Celeste.dll">
-			<Private>false</Private>
-		</Reference>
-		<Reference Include="$(CelestePrefix)\FNA.dll">
-			<Private>false</Private>
-		</Reference>
+		<PackageReference Include="CelesteMod.Publicizer" Version="*" CelesteAssembly="$(CelestePrefix)\Celeste.dll" />
+		<Reference Include="$(CelestePrefix)\MMHOOK_Celeste.dll" Private="false" />
+		<Reference Include="$(CelestePrefix)\FNA.dll" Private="false" />
+		<Reference Include="$(CelestePrefix)\NLua.dll" Private="false" />
 	</ItemGroup>
 
 </Project>

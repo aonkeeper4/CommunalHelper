@@ -28,9 +28,9 @@ public class DreamBlockDummy : DreamBlock
     private readonly DynamicData data;
 
     public DreamBlockDummy(Entity entity)
-        : base(entity.Position, entity.Width, entity.Height, null, false, false)
+        : base(entity.Position, 0, 0, null, false, false)
     {
-        Collidable = Active = Visible = false;
+        Collidable = Visible = false;
         Entity = entity;
 
         data = new DynamicData(typeof(DreamBlock), this);
@@ -47,9 +47,7 @@ public class DreamBlockDummy : DreamBlock
     }
 
     public override void Update()
-    {
-        Position = Entity.Position;
-    }
+        => Position = Entity.Position;
 
     public override void Render() { }
 

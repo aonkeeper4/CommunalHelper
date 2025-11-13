@@ -912,11 +912,11 @@ public class DreamMoveBlock : CustomDreamBlock
     #region Hooks
 
     private static FieldInfo f_this;
-    private static List<IDetour> hook_DreamBlock_Routines;
+    private static List<ILHook> hook_DreamBlock_Routines;
 
     internal static new void Load()
     {
-        hook_DreamBlock_Routines = new List<IDetour>();
+        hook_DreamBlock_Routines = new List<ILHook>();
         Type[] nestedTypes = typeof(DreamBlock).GetNestedTypes(BindingFlags.NonPublic);
         foreach (string method in new string[] { "FastActivate", "FastDeactivate", "Activate", "Deactivate" })
         {

@@ -31,7 +31,7 @@ public class DreamSwapBlock : CustomDreamBlock
             float scale = 0.5f * (0.5f + (((float) Math.Sin(timer) + 1f) * 0.25f));
             scale = Calc.LerpClamp(scale, 1, block.ColorLerp);
 
-            (_, _, Color? controllerActiveLineColor, _, _) = Imports.PandorasBox.GetVisualSettingsFor(this);
+            Imports.PandorasBox.GetVisualSettingsFor(this, out _, out _, out Color? controllerActiveLineColor, out _, out _, out _);
             Color activeLineColor = controllerActiveLineColor ?? DreamBlock.activeLineColor;
             
             Util.DrawBlockStyle(SceneAs<Level>().Camera, new Vector2(block.moveRect.X, block.moveRect.Y), block.moveRect.Width, block.moveRect.Height, block.nineSliceTarget, null, activeLineColor * scale);

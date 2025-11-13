@@ -351,8 +351,12 @@ public class ConnectedDreamBlock : CustomDreamBlock
         if (!MasterOfGroup)
             return;
 
-        (Color? controllerActiveBackColor, Color? controllerDisabledBackColor, Color? controllerActiveLineColor, Color? controllerDisabledLineColor, _)
-            = Imports.PandorasBox.GetVisualSettingsFor(this);
+        Imports.PandorasBox.GetVisualSettingsFor(this,
+            out Color? controllerActiveBackColor,
+            out Color? controllerDisabledBackColor,
+            out Color? controllerActiveLineColor,
+            out Color? controllerDisabledLineColor,
+            out _, out _);
         Color backColor = Color.Lerp(PlayerHasDreamDash
             ? controllerActiveBackColor ?? activeBackColor
             : controllerDisabledBackColor ?? disabledBackColor, Color.White, ColorLerp);

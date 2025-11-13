@@ -29,7 +29,7 @@ public class DreamTunnelEntryRenderer : Entity
                 Vector2 start = shake + e.Start;
                 Vector2 end = shake + e.End;
 
-                (Color? controllerActiveBackColor, Color? controllerDisabledBackColor, _, _, _) = Imports.PandorasBox.GetVisualSettingsFor(e);
+                Imports.PandorasBox.GetVisualSettingsFor(e, out Color? controllerActiveBackColor, out Color? controllerDisabledBackColor, out _, out _, out _, out _);
                 Color backColor = e.PlayerHasDreamDash
                     ? controllerActiveBackColor ?? DreamBlock.activeBackColor
                     : controllerDisabledBackColor ?? DreamBlock.disabledBackColor;

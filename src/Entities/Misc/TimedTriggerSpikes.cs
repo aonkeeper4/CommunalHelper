@@ -511,7 +511,7 @@ public class TimedTriggerSpikes : Entity
 
     #region Hooks
 
-    private static IDetour hook_TimedTriggerSpikes_GetHue;
+    private static ILHook hook_TimedTriggerSpikes_GetHue;
     private bool playerPresent;
 
     internal static void LoadDelayed()

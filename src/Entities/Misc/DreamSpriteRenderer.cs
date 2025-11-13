@@ -91,8 +91,12 @@ internal class DreamSpriteRenderer : Entity
             if (!boundsOnScreen.Intersects(buffer.Bounds) || !sprite.Visible)
                 continue;
             
-            (Color? controllerActiveBackColor, Color? controllerDisabledBackColor, Color? controllerActiveLineColor, Color? controllerDisabledLineColor, _)
-                = PandorasBox.GetVisualSettingsFor(sprite.Marker);
+            PandorasBox.GetVisualSettingsFor(sprite.Marker,
+                out Color? controllerActiveBackColor,
+                out Color? controllerDisabledBackColor,
+                out Color? controllerActiveLineColor,
+                out Color? controllerDisabledLineColor,
+                out _, out _);
 
             // outline
             Draw.SpriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, DepthStencilState.Default, RasterizerState.CullNone, null);

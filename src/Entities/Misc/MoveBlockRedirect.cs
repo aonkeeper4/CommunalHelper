@@ -426,7 +426,7 @@ public class MoveBlockRedirect : Entity
 
     #region Hooks
 
-    private static IDetour hook_MoveBlock_Controller;
+    private static ILHook hook_MoveBlock_Controller;
 
     internal static void Load()
     {

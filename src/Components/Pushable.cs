@@ -139,7 +139,7 @@ public class Pushable : Component
     }
 
     // ReSharper disable once InconsistentNaming
-    private static IDetour hook_Player_orig_UpdateSprite;
+    private static ILHook hook_Player_orig_UpdateSprite;
 
     internal static void Load()
     {

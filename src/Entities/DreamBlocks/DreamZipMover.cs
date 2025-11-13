@@ -189,7 +189,7 @@ public class DreamZipMover : CustomDreamBlock
             if (!cameraBounds.Intersects(bounds))
                 return;
 
-            (_, _, Color? controllerActiveLineColor, Color? controllerDisabledLineColor, _) = Imports.PandorasBox.GetVisualSettingsFor(this);
+            Imports.PandorasBox.GetVisualSettingsFor(this, out _, out _, out Color? controllerActiveLineColor, out Color? controllerDisabledLineColor, out _, out _);
             Color activeLineColor = controllerActiveLineColor ?? DreamBlock.activeLineColor;
             Color disabledLineColor = controllerDisabledLineColor ?? DreamBlock.disabledLineColor;
 

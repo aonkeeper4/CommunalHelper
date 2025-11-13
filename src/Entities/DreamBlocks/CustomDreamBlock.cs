@@ -2,6 +2,7 @@
 using MonoMod.Cil;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Celeste.Mod.CommunalHelper.Entities;
 
@@ -154,22 +155,23 @@ public abstract class CustomDreamBlock : DreamBlock
 
     private Color GetParticleColor(int layer, Color[] dashColors)
     {
-        Color defaultColor = layer switch
-        {
-            0 => Calc.Random.Choose(DreamColors[0], DreamColors[1], DreamColors[2]),
-            1 => Calc.Random.Choose(DreamColors[3], DreamColors[4], DreamColors[5]),
-            2 => Calc.Random.Choose(DreamColors[6], DreamColors[7], DreamColors[8]),
-            _ => throw new NotImplementedException()
-        };
-        (_, _, _, _, List<List<Color>> particleLayerColors) = Imports.PandorasBox.GetVisualSettingsFor(this);
+        Imports.PandorasBox.GetVisualSettingsFor(this, out _, out _, out _, out _, out Color[][] activeParticleLayerColors, out Color[][] disabledParticleLayerColors);
         
         return PlayerHasDreamDash
             ? RefillCount != -1
                 ? dashColors[layer]
-                : particleLayerColors is not null
-                    ? Calc.Random.Choose(particleLayerColors[layer])
-                    : defaultColor
-            : Color.LightGray * (0.5f + layer / 2f * 0.5f);
+                : activeParticleLayerColors is not null
+                    ? Calc.Random.Choose(activeParticleLayerColors[layer])
+                    : layer switch
+                    {
+                        0 => Calc.Random.Choose(DreamColors[0], DreamColors[1], DreamColors[2]),
+                        1 => Calc.Random.Choose(DreamColors[3], DreamColors[4], DreamColors[5]),
+                        2 => Calc.Random.Choose(DreamColors[6], DreamColors[7], DreamColors[8]),
+                        _ => throw new NotImplementedException()
+                    }
+            : disabledParticleLayerColors is not null
+                ? Calc.Random.Choose(disabledParticleLayerColors[layer])
+                : Color.LightGray * (0.5f + layer / 2f * 0.5f);
     }
 
     private void ShakeParticles()
@@ -263,8 +265,12 @@ public abstract class CustomDreamBlock : DreamBlock
         if (Right < camera.Left || Left > camera.Right || Bottom < camera.Top || Top > camera.Bottom)
             return;
 
-        (Color? controllerActiveBackColor, Color? controllerDisabledBackColor, Color? controllerActiveLineColor, Color? controllerDisabledLineColor, _)
-            = Imports.PandorasBox.GetVisualSettingsFor(this);
+        Imports.PandorasBox.GetVisualSettingsFor(this,
+            out Color? controllerActiveBackColor,
+            out Color? controllerDisabledBackColor,
+            out Color? controllerActiveLineColor,
+            out Color? controllerDisabledLineColor,
+            out _, out _);
         Color backColor = Color.Lerp(PlayerHasDreamDash
             ? controllerActiveBackColor ?? activeBackColor
             : controllerDisabledBackColor ?? disabledBackColor, Color.White, ColorLerp);
@@ -500,7 +506,7 @@ public abstract class CustomDreamBlock : DreamBlock
             player.Position += player.DashDir.Sign();
         
         // Only override speed if there isn't a Dream Dash Controller affecting this block
-        (_, _, bool? overrideDreamDashSpeed, _, _, _, _, _, _) = Imports.PandorasBox.GetGameplaySettingsFor(player.dreamBlock);
+        Imports.PandorasBox.GetGameplaySettingsFor(player.dreamBlock, out _, out _, out bool? overrideDreamDashSpeed, out _, out _, out _, out _, out _, out _);
         if (!(overrideDreamDashSpeed ?? false))
             player.Speed = player.DashDir * customDreamBlock.dashSpeed;
     }
@@ -532,10 +538,9 @@ public abstract class CustomDreamBlock : DreamBlock
             return;
         
         cursor.Emit(OpCodes.Ldarg_0);
-        cursor.EmitDelegate<Func<Player, bool>>(player => player.GetData().Get<DreamBlock>("dreamBlock") is CustomDreamBlock block && block.RefillCount == -2);
+        cursor.EmitDelegate<Func<Player, bool>>(player => player.GetData().Get<DreamBlock>("dreamBlock") is CustomDreamBlock { RefillCount: -2 });
         cursor.Emit(OpCodes.Brtrue_S, cursor.Next.Next);
     }
 
     #endregion
-
 }

@@ -55,9 +55,9 @@ public static class DreamTunnelDash
     // Keep a List<Entity> around to not allocate a new one every CollideAll<T>() call
     private static List<Entity> dreamTunnelBlockers = new();
 
-    private static IDetour hook_Player_DashCoroutine;
-    private static IDetour hook_Player_orig_Update;
-    private static IDetour hook_Player_orig_UpdateSprite;
+    private static ILHook hook_Player_DashCoroutine;
+    private static ILHook hook_Player_orig_Update;
+    private static ILHook hook_Player_orig_UpdateSprite;
 
 
     public enum SpeedConfiguration

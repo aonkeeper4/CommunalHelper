@@ -15,6 +15,7 @@ dreamTunnelBlocker.placements = {
         width = 16,
         height = 16,
         blockDreamTunnelDashes = true,
+        blockDreamBoosters = false,
         blockDreamDashes = false
     }
 }

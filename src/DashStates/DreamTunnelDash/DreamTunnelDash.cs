@@ -700,10 +700,6 @@ public static class DreamTunnelDash
             if (player.Left + dir.X < bounds.Left || player.Right + dir.X > bounds.Right || player.Top + dir.Y < bounds.Top || player.Bottom + dir.Y > bounds.Bottom)
                 return false;
 
-            // Check if we're colliding with a DreamTunnelBlocker
-            if (player.IsDreamTunnelDashBlocked(player.Position + dir))
-                return false;
-
             Solid solid = null;
 
             // Check for dream blocks first, then for solids
@@ -754,6 +750,10 @@ public static class DreamTunnelDash
                     return false;
                 }
             }
+            
+            // Check if we're colliding with a DreamTunnelBlocker
+            if (player.IsDreamTunnelDashBlocked(player.Position + dir))
+                return false;
 
             solid ??= player.CollideFirst<Solid, DreamBlock>(player.Position + dir);
             // Don't dash through if it has a dash collide action, unless it's a farewell floaty block

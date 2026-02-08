@@ -14,6 +14,7 @@ public class DreamBooster : CustomBooster
     public static readonly Color AppearColor = Calc.HexToColor("4d5f6e");
 
     // red, orange, yellow, green, cyan, blue, purple, pink.
+    // this is a really nice rainbow wow i love this thx catapillie - aon
     public static readonly Color[] DreamColors = [
         Calc.HexToColor("ee3566"),
         Calc.HexToColor("ff7b3d"),
@@ -162,31 +163,36 @@ public class DreamBoosterHooks
 
     private static void Player_OnCollideH(On.Celeste.Player.orig_OnCollideH orig, Player self, CollisionData data)
     {
-        Player_OnCollide(new Action<Player, CollisionData>(orig), self, data);
+        Player_OnCollide(new Action<Player, CollisionData>(orig), self, data, Vector2.UnitX * Math.Sign(self.Speed.X));
     }
 
     private static void Player_OnCollideV(On.Celeste.Player.orig_OnCollideV orig, Player self, CollisionData data)
     {
-        Player_OnCollide(new Action<Player, CollisionData>(orig), self, data);
+        Player_OnCollide(new Action<Player, CollisionData>(orig), self, data, Vector2.UnitY * Math.Sign(self.Speed.Y));
     }
 
-    private static void Player_OnCollide(Action<Player, CollisionData> orig, Player self, CollisionData data)
+    private static void Player_OnCollide(Action<Player, CollisionData> orig, Player self, CollisionData data, Vector2 dir)
     {
         if (dreamBoostMove)
         {
             if (data.Hit is not DreamBlock block)
             {
-                EmitDreamBurst(self, data.Hit.Collider);
-                return;
-            }
-
-            if (DynamicData.For(block).Get<bool>("playerHasDreamDash"))
-            {
-                self.Die(-data.Moved);
-                return;
+                if (self.CollideFirst<DreamTunnelBlocker>(self.Position + dir) is not { BlockDreamBoosters: true })
+                {
+                    EmitDreamBurst(self, data.Hit.Collider);
+                    return;
+                }
             }
             else
-                dreamBoostStop = true;
+            {
+                if (DynamicData.For(block).Get<bool>("playerHasDreamDash"))
+                {
+                    self.Die(-dir);
+                    return;
+                }
+            }
+            
+            dreamBoostStop = true;
         }
 
         orig(self, data);

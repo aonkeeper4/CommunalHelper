@@ -993,6 +993,7 @@ entities.CommunalHelper/SJ/PelletEmitter.attributes.description.wiggleHitbox=Whe
 
 entities.CommunalHelper/DreamTunnelBlocker.placements.name.normal=Dream Tunnel Blocker
 entities.CommunalHelper/DreamTunnelBlocker.attributes.description.blockDreamTunnelDashes=Whether to prevent dream tunneling when dashing into a solid covered by this entity.
+entities.CommunalHelper/DreamTunnelBlocker.attributes.description.blockDreamBoosters=Whether to prevent dream tunneling when a dream booster collides with a solid covered by this entity.
 entities.CommunalHelper/DreamTunnelBlocker.attributes.description.blockDreamDashes=Whether to prevent dream dashing when dashing into a dream block covered by this entity.
 
 # ---------------------- TRIGGERS --------------------------
